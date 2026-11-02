@@ -1,0 +1,29 @@
+
+# R / RStudio
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Archivos temporales
+.DS_Store
+Thumbs.db
+~$*.xlsx
+~$*.pbix
+*.tmp
+
+# Credenciales y secretos
+.env
+.env.*
+!.env.example
+
+# Salidas temporales
+outputs/temp/
+  
