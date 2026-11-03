@@ -1,0 +1,38 @@
+project:
+  type: book
+  output-dir: outputs/libro
+  execute-dir: project
+
+book:
+  title: "Proyecto final — Ciencia de Datos"
+  subtitle: "Producción agrícola de Argentina por departamento (1969/70 – 2016/17)"
+  author: "TU NOMBRE"
+  date: today
+  chapters:
+    - index.qmd
+    - part: "Fase 1 · Comprensión y exploración"
+      chapters:
+        - r/01_exploracion_R.qmd
+        - python/01b_exploracion_python.qmd
+    - part: "Fase 2 · Limpieza y preprocesamiento"
+      chapters:
+        - 02_limpieza_R.qmd
+    # Las siguientes fases se agregarán aquí:
+    # - 03_atipicos_R.qmd
+    # - 04_eda_R.qmd / 04b_eda_python.qmd
+    # - 05_visualizacion_R.qmd
+    # - 06_preparacion_ml_python.qmd
+    # - 07_modelado_python.qmd
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: true
+    code-tools: true
+
+lang: es
+
+execute:
+  warning: false
+  message: false

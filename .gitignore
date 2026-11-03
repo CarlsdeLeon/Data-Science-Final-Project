@@ -1,9 +1,13 @@
 
 # R / RStudio
 .Rproj.user/
+.quarto/
+_freeze/
 .Rhistory
 .RData
 .Ruserdata
+*_cache/
+
 
 # Python
 __pycache__/

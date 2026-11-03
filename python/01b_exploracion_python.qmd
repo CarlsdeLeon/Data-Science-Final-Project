@@ -1,0 +1,114 @@
+---
+title: "Fase 1 — Comprensión, carga y exploración inicial (Python)"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import pandas as pd
+import numpy as np
+
+pd.set_option("display.float_format", "{:,.1f}".format)
+pd.set_option("display.max_columns", None)
+
+ruta = "data/agricultura.csv"   # ajusta si tu archivo está en otra carpeta
+```
+
+## Importación de datos
+
+Lectura directa, sin ajustes:
+
+```{python}
+#| label: lectura-cruda
+crudo = pd.read_csv(ruta)
+print(crudo.dtypes)
+crudo.iloc[:3, [9, 10, 11, 12]]
+```
+
+Igual que en R: `Producción (Tn)` queda como texto y los números con punto de miles se leen mal
+(`3.333` debería ser 3,333). Se importa todo como texto y se convierte:
+
+```{python}
+#| label: lectura-corregida
+nombres = ["id_provincia", "provincia", "id_departamento", "departamento",
+           "id_cultivo", "cultivo", "id_campana", "campana", "temperatura_c",
+           "sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn",
+           "rendimiento_kg_ha", "calidad"]
+
+datos = pd.read_csv(ruta, dtype=str, header=0, names=nombres)
+
+enteras = ["id_provincia", "id_departamento", "id_cultivo", "id_campana", "temperatura_c"]
+miles = ["sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_kg_ha"]
+
+datos[enteras] = datos[enteras].astype(int)
+for c in miles:
+    datos[c] = pd.to_numeric(datos[c].str.replace(".", "", regex=False))
+```
+
+## Estructura del DataFrame
+
+```{python}
+#| label: estructura
+print(datos.shape)
+datos.info()
+```
+
+## Registros iniciales y finales
+
+```{python}
+#| label: head-tail
+display(datos.head())
+display(datos.tail())
+```
+
+## Tipos de variables
+
+```{python}
+#| label: tipos
+tipos = {
+    "numéricas continuas": miles,
+    "numérica discreta": ["temperatura_c"],
+    "categóricas": ["provincia", "departamento", "cultivo", "calidad"],
+    "temporal": ["campana"],
+    "identificadores": ["id_provincia", "id_departamento", "id_cultivo", "id_campana"],
+}
+for k, v in tipos.items():
+    print(f"{k}: {v}")
+```
+
+## Estadísticas descriptivas
+
+```{python}
+#| label: descriptivas
+datos[miles + ["temperatura_c"]].describe().T
+```
+
+```{python}
+#| label: frecuencias
+display(datos["calidad"].value_counts(normalize=True).mul(100).round(1))
+display(datos[["provincia", "cultivo", "campana"]].nunique())
+```
+
+## Problemas de calidad
+
+```{python}
+#| label: calidad
+clave = ["id_provincia", "id_departamento", "id_cultivo", "id_campana"]
+problemas = pd.Series({
+    "Valores faltantes explícitos": int(datos.isna().sum().sum()),
+    "Filas duplicadas": int(datos.duplicated().sum()),
+    "Claves duplicadas": int(datos.duplicated(subset=clave).sum()),
+    "Departamentos con espacios dobles": int(datos["departamento"].str.contains(r"\s{2,}").sum()),
+    "Sin siembra ni cosecha": int(((datos.sup_sembrada_ha == 0) & (datos.sup_cosechada_ha == 0)).sum()),
+    "Producción > 0 con cosechada = 0": int(((datos.sup_cosechada_ha == 0) & (datos.produccion_tn > 0)).sum()),
+    "Cosechada > sembrada": int((datos.sup_cosechada_ha > datos.sup_sembrada_ha).sum()),
+    "Cosechada > 0 con producción = 0": int(((datos.sup_cosechada_ha > 0) & (datos.produccion_tn == 0)).sum()),
+})
+problemas.to_frame("filas")
+```
+
+## Conclusión de la fase
+
+Los resultados coinciden con los de R: 132,769 filas, 14 columnas, sin NA explícitos ni duplicados.
+El problema central es el formato numérico (punto de miles) y la presencia de ceros que ocultan datos faltantes,
+que se tratan en la Fase 2.

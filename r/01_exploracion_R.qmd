@@ -1,0 +1,182 @@
+---
+title: "Fase 1 — Comprensión, carga y exploración inicial (R)"
+---
+
+```{r}
+#| label: setup
+library(tidyverse)
+library(knitr)
+
+ruta <- "data/agricultura.csv"   # ajusta si tu archivo está en otra carpeta
+```
+
+## 1. Planteamiento analítico inicial
+
+Preguntas que guiarán todo el proyecto:
+
+1. ¿Cómo evolucionaron la superficie sembrada, la producción y el rendimiento entre 1969/70 y 2016/17?
+2. ¿Qué provincias y cultivos concentran la mayor superficie y producción?
+3. ¿Qué tan fuerte es la relación entre superficie cosechada y producción?
+4. ¿Qué cultivos tienen mayor variabilidad en su rendimiento?
+5. ¿Se puede **predecir el rendimiento (kg/ha)** a partir de superficie, cultivo, provincia y campaña? *(regresión, Fase 7)*
+6. ¿Se puede **clasificar la calidad** (Baja / Promedio / Alta) a partir de las demás variables? *(clasificación multiclase, Fase 7)*
+
+## 2. Importación de datos
+
+Primero se lee el archivo "tal cual" para ver qué pasa:
+
+```{r}
+#| label: lectura-cruda
+crudo <- read_csv(ruta, show_col_types = FALSE)
+glimpse(crudo)
+```
+
+**Hallazgos de la importación directa:**
+
+- Los nombres de dos columnas vienen con caracteres dañados (`Campa�a`, `Producci�n`).
+- `Producción (Tn)` se importa como **texto**, no como número.
+- Los números usan **el punto como separador de miles** (ej. `3.333` = 3,333; `1.050.000` = 1,050,000).
+  R los interpreta como decimales, lo que altera todas las magnitudes.
+
+Comprobación con la primera fila (10 Tn producidas en 3 ha deberían dar 3,333 kg/ha):
+
+```{r}
+#| label: comprobacion-miles
+crudo[1, c(10, 11, 12, 13)]
+10 / 3 * 1000
+```
+
+El rendimiento reportado (`3.333`) coincide con 3,333, no con 3.333. Por eso se importa todo como texto y se convierte con `parse_number()`:
+
+```{r}
+#| label: lectura-corregida
+nombres <- c("id_provincia", "provincia", "id_departamento", "departamento",
+             "id_cultivo", "cultivo", "id_campana", "campana", "temperatura_c",
+             "sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn",
+             "rendimiento_kg_ha", "calidad")
+
+loc_ar <- locale(decimal_mark = ",", grouping_mark = ".")
+
+datos <- read_csv(ruta, col_types = cols(.default = col_character()),
+                  show_col_types = FALSE) |>
+  set_names(nombres) |>
+  mutate(
+    across(c(id_provincia, id_departamento, id_cultivo, id_campana, temperatura_c), as.integer),
+    across(c(sup_sembrada_ha, sup_cosechada_ha, produccion_tn, rendimiento_kg_ha),
+           \(x) parse_number(x, locale = loc_ar))
+  )
+```
+
+*(El tratamiento formal de tipos y formatos se documenta en la Fase 2.)*
+
+## 3. Creación y manipulación de DataFrames
+
+En R los DataFrames se manejan como *tibbles*. Ejemplos de creación y manipulación:
+
+```{r}
+#| label: dataframes
+# Crear un tibble nuevo a partir de los datos: catálogo de cultivos
+catalogo_cultivos <- datos |>
+  distinct(id_cultivo, cultivo) |>
+  arrange(id_cultivo)
+head(catalogo_cultivos, 5)
+
+# Crear una columna nueva y resumir por grupo
+datos |>
+  mutate(rendimiento_t_ha = rendimiento_kg_ha / 1000) |>
+  group_by(cultivo) |>
+  summarise(registros = n(), rend_medio_t_ha = mean(rendimiento_t_ha)) |>
+  arrange(desc(registros)) |>
+  head(8) |>
+  kable(digits = 2, big.mark = ",")
+```
+
+## 4. Dimensiones, columnas, tipos y estructura
+
+```{r}
+#| label: estructura
+dim(datos)
+glimpse(datos)
+```
+
+## 5. Registros iniciales y finales
+
+```{r}
+#| label: head-tail
+kable(head(datos, 5))
+kable(tail(datos, 5))
+```
+
+## 6. Tipos de variables
+
+| Tipo | Variables |
+|------|-----------|
+| **Numéricas continuas** | `sup_sembrada_ha`, `sup_cosechada_ha`, `produccion_tn`, `rendimiento_kg_ha` |
+| **Numérica discreta** | `temperatura_c` |
+| **Categóricas nominales** | `provincia`, `departamento`, `cultivo` |
+| **Categórica ordinal** | `calidad` (Baja < Promedio < Alta) |
+| **Temporal** | `campana` (ej. 1969/70), `id_campana` |
+| **Identificadores** | `id_provincia`, `id_departamento`, `id_cultivo` |
+
+## 7. Estadísticas descriptivas iniciales
+
+```{r}
+#| label: descriptivas
+datos |>
+  select(sup_sembrada_ha, sup_cosechada_ha, produccion_tn, rendimiento_kg_ha, temperatura_c) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
+  group_by(variable) |>
+  summarise(n = n(), media = mean(valor), mediana = median(valor), sd = sd(valor),
+            min = min(valor), q1 = quantile(valor, .25), q3 = quantile(valor, .75),
+            max = max(valor)) |>
+  kable(digits = 1, big.mark = ",")
+```
+
+```{r}
+#| label: frecuencias
+datos |> count(calidad) |> mutate(pct = round(100 * n / sum(n), 1)) |> kable()
+datos |> count(provincia, sort = TRUE) |> head(8) |> kable()
+```
+
+Observación: la media es muy superior a la mediana en superficie y producción, lo que indica
+**distribuciones muy asimétricas a la derecha** (pocos departamentos con valores enormes).
+
+## 8. Posibles problemas de calidad de datos
+
+```{r}
+#| label: calidad
+tibble(
+  problema = c(
+    "Valores faltantes explícitos (NA)",
+    "Filas completamente duplicadas",
+    "Claves duplicadas (provincia-depto-cultivo-campaña)",
+    "Nombres de departamento con espacios dobles",
+    "Sin siembra ni cosecha (sembrada = cosechada = 0)",
+    "Producción > 0 con superficie cosechada = 0",
+    "Superficie cosechada > sembrada",
+    "Superficie cosechada > 0 con producción = 0"
+  ),
+  filas = c(
+    sum(is.na(datos)),
+    sum(duplicated(datos)),
+    sum(duplicated(datos[c("id_provincia", "id_departamento", "id_cultivo", "id_campana")])),
+    sum(str_detect(datos$departamento, "\\s{2,}")),
+    sum(datos$sup_sembrada_ha == 0 & datos$sup_cosechada_ha == 0),
+    sum(datos$sup_cosechada_ha == 0 & datos$produccion_tn > 0),
+    sum(datos$sup_cosechada_ha > datos$sup_sembrada_ha),
+    sum(datos$sup_cosechada_ha > 0 & datos$produccion_tn == 0)
+  )
+) |> kable(format.args = list(big.mark = ","))
+```
+
+Además: `id_departamento` **no es único** a nivel nacional (se repite entre provincias), por lo que
+se necesita la combinación provincia + departamento como clave.
+
+## Conclusión de la fase
+
+- El dataset tiene **132,769 filas y 14 columnas**, con 23 provincias, 32 cultivos y 48 campañas.
+- No hay valores faltantes explícitos ni filas duplicadas.
+- El principal problema de formato es el **punto como separador de miles**, que si no se corrige invalida todas las variables numéricas.
+- Existen **ceros con significado dudoso**: filas sin actividad y filas con producción pero superficie cosechada 0.
+  Estas últimas son datos faltantes encubiertos y se tratarán en la Fase 2.
+- Las variables numéricas son muy asimétricas, lo que anticipa valores atípicos (Fase 3) y transformaciones logarítmicas (Fase 6).

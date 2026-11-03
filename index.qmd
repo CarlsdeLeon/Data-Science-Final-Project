@@ -1,0 +1,29 @@
+# Introducción {.unnumbered}
+
+## Contexto
+
+Este proyecto analiza la **producción agrícola de Argentina a nivel de departamento**, para 32 cultivos
+y 48 campañas (1969/70 a 2016/17). Cada fila corresponde a una combinación
+*departamento × cultivo × campaña* con su superficie sembrada, superficie cosechada, producción y rendimiento.
+
+## Estructura del proyecto
+
+| Fase | Contenido | Herramienta |
+|------|-----------|-------------|
+| 1 | Comprensión, carga y exploración inicial | R y Python |
+| 2 | Limpieza y preprocesamiento (incluye imputación) | R |
+| 3 | Tratamiento de valores atípicos | R |
+| 4 | Análisis exploratorio y estadístico | R y Python |
+| 5 | Visualización de datos | R |
+| 6 | Preparación para aprendizaje automático | Python |
+| 7 | Modelado predictivo y evaluación | Python |
+
+## Flujo de datos
+
+```
+data/agricultura.csv  --(Fase 1: explorar)-->  --(Fase 2 y 3: limpiar)-->  data/agricultura_limpia.csv
+                                                                                    |
+                                                         Fases 4 a 7 (R y Python) <-+
+```
+
+La Fase 2 (R) genera `data/agricultura_limpia.csv`, y ese archivo es el que leen las fases en Python.
