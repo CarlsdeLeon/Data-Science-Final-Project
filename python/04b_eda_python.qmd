@@ -1,0 +1,192 @@
+---
+title: "Fase 4 — Análisis exploratorio y estadístico (Python)"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+from scipy.stats import contingency
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
+sns.set_theme(style="whitegrid")
+pd.set_option("display.float_format", "{:,.2f}".format)
+
+datos = pd.read_csv("data/agricultura_final.csv")   # generado en la Fase 3 (R)
+
+act = datos[(datos.sup_sembrada_ha > 0) & (datos.sup_cosechada_ha > 0) &
+            (datos.produccion_tn > 0) & (datos.rendimiento_wins_kg_ha > 0)].copy()
+act["calidad"] = pd.Categorical(act["calidad"], categories=["Baja", "Promedio", "Alta"], ordered=True)
+
+top8 = act["cultivo"].value_counts().head(8).index
+act["cultivo_g"] = act["cultivo"].where(act["cultivo"].isin(top8), "Otros")
+
+vars_num = ["sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_wins_kg_ha"]
+```
+
+## 27. Análisis univariado
+
+```{python}
+#| label: univariado
+uni = act[vars_num + ["temperatura_c"]].agg(["count", "mean", "median", "std", "skew"]).T
+uni["cv_pct"] = 100 * uni["std"] / uni["mean"]
+uni
+```
+
+## 28. Análisis bivariado
+
+```{python}
+#| label: bivariado
+r = np.corrcoef(np.log(act.sup_cosechada_ha), np.log(act.produccion_tn))[0, 1]
+print(f"Correlación log(superficie cosechada) vs log(producción): {r:.3f}")
+
+display(act.groupby("calidad", observed=True)["rendimiento_wins_kg_ha"].agg(["count", "mean", "median"]))
+
+grupos = [g.values for _, g in act.groupby("calidad", observed=True)["rendimiento_wins_kg_ha"]]
+print("Kruskal-Wallis (rendimiento por calidad):", stats.kruskal(*grupos))
+print("Spearman temperatura vs rendimiento:", stats.spearmanr(act.temperatura_c, act.rendimiento_wins_kg_ha))
+```
+
+## 29. Análisis multivariado (PCA)
+
+```{python}
+#| label: pca
+X = pd.DataFrame({
+    "sup_sembrada": np.log(act.sup_sembrada_ha),
+    "sup_cosechada": np.log(act.sup_cosechada_ha),
+    "produccion": np.log(act.produccion_tn),
+    "rendimiento": np.log(act.rendimiento_wins_kg_ha),
+    "temperatura": act.temperatura_c,
+})
+Xs = StandardScaler().fit_transform(X)
+pca = PCA().fit(Xs)
+
+print("Varianza explicada:", np.round(pca.explained_variance_ratio_, 3))
+display(pd.DataFrame(pca.components_[:2].T, index=X.columns, columns=["PC1", "PC2"]))
+
+comp = pca.transform(Xs)[:, :2]
+muestra = np.random.default_rng(2026).choice(len(comp), 5000, replace=False)
+plt.figure(figsize=(7, 5))
+sns.scatterplot(x=comp[muestra, 0], y=comp[muestra, 1], hue=act["calidad"].iloc[muestra], alpha=0.4, s=12)
+plt.title("Componentes principales (muestra de 5,000 registros)")
+plt.xlabel("PC1"); plt.ylabel("PC2")
+plt.show()
+```
+
+## 30. Frecuencias absolutas y relativas
+
+```{python}
+#| label: frecuencias
+def frec(s):
+    f = s.value_counts().to_frame("n")
+    f["pct"] = 100 * f["n"] / f["n"].sum()
+    f["pct_acum"] = f["pct"].cumsum()
+    return f
+
+display(frec(datos["calidad"]))
+display(frec(datos["provincia"]).head(10))
+display(frec(datos["cultivo"]).head(10))
+```
+
+## 31. Tablas de contingencia
+
+```{python}
+#| label: contingencia
+tab = pd.crosstab(act["cultivo_g"], act["calidad"])
+display(tab)
+
+chi2, p, gl, _ = stats.chi2_contingency(tab)
+print(f"Chi-cuadrado = {chi2:,.1f}, gl = {gl}, p = {p:.4g}")
+print(f"V de Cramér = {contingency.association(tab.values, method='cramer'):.3f}")
+```
+
+## 32. Distribuciones y porcentajes por categoría
+
+```{python}
+#| label: porcentajes
+pct = pd.crosstab(act["cultivo_g"], act["calidad"], normalize="index") * 100
+display(pct.round(1))
+
+pct.plot(kind="barh", stacked=True, figsize=(8, 5))
+plt.title("Distribución de calidad por cultivo")
+plt.xlabel("Porcentaje de registros")
+plt.show()
+
+prov = act.groupby("provincia")["sup_cosechada_ha"].sum().sort_values(ascending=False)
+display((100 * prov / prov.sum()).head(10).round(1).to_frame("% de superficie cosechada"))
+```
+
+## 33. Tendencia central y dispersión por cultivo
+
+```{python}
+#| label: dispersion
+disp = (act.groupby("cultivo")["rendimiento_wins_kg_ha"]
+        .agg(n="count", media="mean", mediana="median", desv="std",
+             iqr=lambda s: s.quantile(.75) - s.quantile(.25)))
+disp = disp[disp.n >= 100]
+disp["cv_pct"] = 100 * disp["desv"] / disp["media"]
+disp.sort_values("cv_pct", ascending=False).head(10)
+```
+
+## 34. Análisis de correlación
+
+```{python}
+#| label: correlacion
+display(X.corr(method="pearson"))
+display(X.corr(method="spearman"))
+```
+
+## 35. Matriz y mapa de calor
+
+```{python}
+#| label: heatmap
+plt.figure(figsize=(7, 5))
+sns.heatmap(X.corr(method="spearman"), annot=True, fmt=".2f", cmap="RdBu_r", vmin=-1, vmax=1)
+plt.title("Mapa de calor de correlaciones (Spearman)")
+plt.show()
+```
+
+## 36. Análisis descriptivo y diagnóstico de patrones
+
+```{python}
+#| label: tendencias
+principales = act[act.cultivo.isin(["Soja", "Maiz", "Trigo", "Girasol"])]
+prod = principales.groupby(["anio_inicio", "cultivo"])["produccion_tn"].sum().unstack() / 1e6
+
+prod.plot(figsize=(9, 5))
+plt.title("Producción nacional por campaña")
+plt.xlabel("Año de inicio de campaña")
+plt.ylabel("Producción (millones de toneladas)")
+plt.show()
+```
+
+```{python}
+#| label: tendencia-rendimiento
+filas = []
+for cultivo, g in act.groupby("cultivo"):
+    if len(g) >= 100:
+        lr = stats.linregress(g.anio_inicio, g.rendimiento_wins_kg_ha)
+        filas.append({"cultivo": cultivo, "pendiente_kg_ha_por_anio": lr.slope, "r2": lr.rvalue**2})
+
+pd.DataFrame(filas).sort_values("pendiente_kg_ha_por_anio", ascending=False).head(10)
+```
+
+```{python}
+#| label: diferencias-provincias
+maiz = act[act.cultivo == "Maiz"]
+resumen = maiz.groupby("provincia")["rendimiento_wins_kg_ha"].agg(["count", "median"])
+display(resumen[resumen["count"] >= 30].sort_values("median", ascending=False))
+
+grupos = [g.values for _, g in maiz.groupby("provincia")["rendimiento_wins_kg_ha"] if len(g) >= 30]
+print("Kruskal-Wallis entre provincias (maíz):", stats.kruskal(*grupos))
+```
+
+## Conclusiones de la fase
+
+Los resultados deben coincidir con los de R (mismas correlaciones, mismos p-valores y mismas tendencias).
+Completa con tu interpretación estadística de cada prueba y confirma que ambos lenguajes llegan a las mismas conclusiones.

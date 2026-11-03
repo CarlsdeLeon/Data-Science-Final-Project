@@ -16,7 +16,17 @@ book:
         - python/01b_exploracion_python.qmd
     - part: "Fase 2 · Limpieza y preprocesamiento"
       chapters:
-        - 02_limpieza_R.qmd
+        - r/02_limpieza_R.qmd
+    - part: "Fase 3 · Valores atípicos"
+      chapters:
+        - r/03_atipicos_R.qmd
+    - part: "Fase 4 · Análisis exploratorio"
+      chapters:
+        - r/04_eda_R.qmd
+        - python/04b_eda_python.qmd
+    - part: "Fase 5 · Visualización"
+      chapters:
+        - r/05_visualizacion_R.qmd
     # Las siguientes fases se agregarán aquí:
     # - 03_atipicos_R.qmd
     # - 04_eda_R.qmd / 04b_eda_python.qmd

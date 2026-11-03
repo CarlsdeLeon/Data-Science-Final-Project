@@ -1,0 +1,137 @@
+---
+title: "Fase 5 — Visualización de datos (R)"
+---
+
+```{r}
+#| label: setup
+library(tidyverse)
+library(knitr)
+library(scales)
+
+theme_set(theme_minimal(base_size = 12))
+
+datos <- readRDS("data/agricultura_final.rds")
+
+act <- datos |>
+  filter(sup_sembrada_ha > 0, sup_cosechada_ha > 0, produccion_tn > 0, rendimiento_wins_kg_ha > 0) |>
+  mutate(
+    cultivo_g = fct_lump_n(factor(cultivo), 8),
+    decada = factor(paste0(floor(anio_inicio / 10) * 10, "s"))
+  )
+```
+
+## 37. Gráficos de barras simples y agrupadas
+
+**Pregunta:** ¿qué cultivos ocupan más superficie en el país?
+
+```{r}
+#| label: barras-simple
+act |>
+  group_by(cultivo) |>
+  summarise(sup_total_ha = sum(sup_cosechada_ha)) |>
+  slice_max(sup_total_ha, n = 10) |>
+  ggplot(aes(reorder(cultivo, sup_total_ha), sup_total_ha)) +
+  geom_col(fill = "#2E6F40") +
+  scale_y_continuous(labels = label_number(scale = 1e-6, suffix = " M")) +
+  coord_flip() +
+  labs(title = "Superficie cosechada acumulada por cultivo (1969/70 – 2016/17)",
+       x = NULL, y = "Superficie acumulada (millones de hectáreas)")
+```
+
+**Interpretación:** *(describe qué cultivos lideran y qué diferencia hay entre ellos).*
+
+**Pregunta:** ¿cómo cambió la superficie de los cultivos principales por década?
+
+```{r}
+#| label: barras-agrupadas
+principales <- c("Soja", "Maiz", "Trigo", "Girasol", "Sorgo")
+
+act |>
+  filter(cultivo %in% principales) |>
+  group_by(decada, cultivo) |>
+  summarise(sup_media_anual_ha = sum(sup_cosechada_ha) / n_distinct(anio_inicio), .groups = "drop") |>
+  ggplot(aes(decada, sup_media_anual_ha, fill = cultivo)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = label_number(scale = 1e-6, suffix = " M")) +
+  labs(title = "Superficie cosechada media anual por década",
+       x = "Década", y = "Superficie (millones de hectáreas por año)", fill = "Cultivo")
+```
+
+**Interpretación:** *(qué cultivo creció o cayó entre décadas).*
+
+## 38. Histogramas
+
+**Pregunta:** ¿cómo se distribuye el rendimiento y la superficie cosechada?
+
+```{r}
+#| label: histogramas
+act |>
+  filter(cultivo == "Soja") |>
+  ggplot(aes(rendimiento_wins_kg_ha)) +
+  geom_histogram(bins = 40, fill = "#3A7CA5", color = "white") +
+  scale_x_continuous(labels = comma) +
+  labs(title = "Distribución del rendimiento de la soja",
+       x = "Rendimiento (kg/ha)", y = "Número de registros")
+
+ggplot(act, aes(sup_cosechada_ha)) +
+  geom_histogram(bins = 40, fill = "#3A7CA5", color = "white") +
+  scale_x_log10(labels = comma) +
+  labs(title = "Distribución de la superficie cosechada (escala logarítmica)",
+       x = "Superficie cosechada (ha, escala log)", y = "Número de registros")
+```
+
+**Interpretación:** *(forma de la distribución; por qué se usa escala logarítmica para la superficie).*
+
+## 39. Diagramas de caja y bigotes
+
+**Pregunta:** ¿qué cultivos tienen mayor rendimiento y mayor variabilidad?
+
+```{r}
+#| label: boxplots
+act |>
+  ggplot(aes(reorder(cultivo_g, rendimiento_wins_kg_ha, median), rendimiento_wins_kg_ha)) +
+  geom_boxplot(fill = "#F2C14E", outlier.alpha = 0.2, outlier.size = 0.6) +
+  scale_y_log10(labels = comma) +
+  coord_flip() +
+  labs(title = "Rendimiento por cultivo", x = NULL, y = "Rendimiento (kg/ha, escala logarítmica)")
+```
+
+**Pregunta:** ¿el rendimiento cambia con la calidad registrada?
+
+```{r}
+#| label: boxplot-calidad
+act |>
+  filter(cultivo %in% c("Soja", "Maiz", "Trigo")) |>
+  ggplot(aes(calidad, rendimiento_wins_kg_ha, fill = calidad)) +
+  geom_boxplot(show.legend = FALSE, outlier.alpha = 0.2) +
+  facet_wrap(~cultivo, scales = "free_y") +
+  scale_y_continuous(labels = comma) +
+  labs(title = "Rendimiento según calidad, por cultivo", x = "Calidad", y = "Rendimiento (kg/ha)")
+```
+
+**Interpretación:** *(qué cultivos difieren más y si la calidad se asocia al rendimiento).*
+
+## 40. Diagramas de dispersión
+
+**Pregunta:** ¿qué tan fuerte es la relación entre superficie cosechada y producción?
+
+```{r}
+#| label: dispersion
+set.seed(2026)
+
+act |>
+  slice_sample(n = 20000) |>
+  ggplot(aes(sup_cosechada_ha, produccion_tn, color = cultivo_g)) +
+  geom_point(alpha = 0.3, size = 0.8) +
+  geom_smooth(aes(group = 1), method = "lm", color = "black", se = FALSE) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  labs(title = "Superficie cosechada vs. producción (muestra de 20,000 registros)",
+       x = "Superficie cosechada (ha, escala log)", y = "Producción (tn, escala log)", color = "Cultivo")
+```
+
+**Interpretación:** *(la relación es casi lineal en escala log; los cultivos se separan en "bandas" según su rendimiento).*
+
+## Pendiente de esta fase
+
+Temas 41 a 46: líneas y tendencias, gráficos circulares, densidad, facetas, composición de múltiples gráficos y visualizaciones interactivas.

@@ -1,0 +1,222 @@
+---
+title: "Fase 3 — Tratamiento de valores atípicos (R)"
+---
+
+```{r}
+#| label: setup
+library(tidyverse)
+library(knitr)
+library(scales)
+
+theme_set(theme_minimal(base_size = 12))
+
+datos <- readRDS("data/agricultura_limpia.rds")   # generado en la Fase 2
+
+# Los atípicos se analizan solo en filas con actividad real:
+# los ceros (pérdida total) son válidos, pero distorsionan los cuartiles.
+act <- datos |> filter(sup_sembrada_ha > 0, sup_cosechada_ha > 0, produccion_tn > 0)
+
+vars_num <- c("sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_kg_ha")
+c(total = nrow(datos), con_actividad = nrow(act))
+```
+
+## 21. Identificación de atípicos mediante estadísticas
+
+Se usan media, mediana, asimetría y la regla del **puntaje z** (|z| > 3).
+
+```{r}
+#| label: estadisticas
+asimetria <- function(x) mean((x - mean(x))^3) / sd(x)^3
+
+tabla_est <- map_dfr(vars_num, \(v) {
+  x <- act[[v]]
+  z <- abs((x - mean(x)) / sd(x))
+  tibble(variable = v, media = mean(x), mediana = median(x), desv = sd(x),
+         asimetria = asimetria(x), maximo = max(x),
+         n_z3 = sum(z > 3), pct_z3 = 100 * mean(z > 3))
+})
+kable(tabla_est, digits = 1, big.mark = ",")
+```
+
+**Lectura:** si la media es mucho mayor que la mediana y la asimetría es alta, la distribución tiene cola derecha larga.
+Muchos de esos valores extremos son departamentos realmente grandes, no errores.
+
+## 22. Cuartiles y rango intercuartílico (IQR)
+
+## 23. Límites inferior y superior
+
+Regla de Tukey: límites = Q1 − 1.5·IQR y Q3 + 1.5·IQR.
+
+```{r}
+#| label: iqr-global
+tabla_iqr <- map_dfr(vars_num, \(v) {
+  x <- act[[v]]
+  q <- quantile(x, c(.25, .75))
+  iqr <- q[[2]] - q[[1]]
+  inf <- q[[1]] - 1.5 * iqr
+  sup <- q[[2]] + 1.5 * iqr
+  tibble(variable = v, q1 = q[[1]], q3 = q[[2]], iqr = iqr,
+         limite_inf = inf, limite_sup = sup,
+         atipicos_inf = sum(x < inf), atipicos_sup = sum(x > sup),
+         pct_atipicos = 100 * mean(x < inf | x > sup))
+})
+kable(tabla_iqr, digits = 1, big.mark = ",")
+```
+
+**Problema de usar límites globales para el rendimiento:** cada cultivo tiene un nivel de rendimiento muy distinto
+(la caña de azúcar produce decenas de miles de kg/ha; el ajo, pocos miles). Con un solo límite, cultivos enteros
+quedarían marcados como atípicos. Por eso para el rendimiento se calculan límites **por cultivo**:
+
+```{r}
+#| label: iqr-cultivo
+iqr_cultivo <- act |>
+  group_by(cultivo) |>
+  filter(n() >= 30) |>
+  summarise(
+    n = n(),
+    q1 = quantile(rendimiento_kg_ha, .25),
+    q3 = quantile(rendimiento_kg_ha, .75),
+    lim_inf = q1 - 1.5 * (q3 - q1),
+    lim_sup = q3 + 1.5 * (q3 - q1),
+    n_atipicos = sum(rendimiento_kg_ha < lim_inf | rendimiento_kg_ha > lim_sup),
+    pct_atipicos = 100 * n_atipicos / n
+  ) |>
+  arrange(desc(n_atipicos))
+
+kable(head(iqr_cultivo, 10), digits = 1, big.mark = ",")
+
+tibble(
+  criterio = c("Límite global", "Límite por cultivo"),
+  atipicos_rendimiento = c(
+    with(tabla_iqr |> filter(variable == "rendimiento_kg_ha"), atipicos_inf + atipicos_sup),
+    sum(iqr_cultivo$n_atipicos)
+  )
+) |> kable(big.mark = ",")
+```
+
+Valores más extremos de rendimiento (conviene revisarlos manualmente):
+
+```{r}
+#| label: extremos
+act |>
+  arrange(desc(rendimiento_kg_ha)) |>
+  select(provincia, departamento, cultivo, campana, sup_cosechada_ha, produccion_tn, rendimiento_kg_ha) |>
+  head(10) |>
+  kable(big.mark = ",")
+```
+
+## 24. Detección visual con boxplots
+
+```{r}
+#| label: boxplots
+act |>
+  select(all_of(vars_num)) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
+  ggplot(aes(x = "", y = valor)) +
+  geom_boxplot(outlier.alpha = 0.2, outlier.size = 0.6) +
+  scale_y_log10(labels = comma) +
+  facet_wrap(~variable, scales = "free_y") +
+  labs(title = "Boxplots de las variables numéricas (escala logarítmica)", x = NULL, y = "Valor")
+
+act |>
+  mutate(cultivo_g = fct_lump_n(factor(cultivo), 8)) |>
+  ggplot(aes(reorder(cultivo_g, rendimiento_kg_ha, median), rendimiento_kg_ha)) +
+  geom_boxplot(outlier.alpha = 0.2, outlier.size = 0.6) +
+  scale_y_log10(labels = comma) +
+  coord_flip() +
+  labs(title = "Rendimiento por cultivo", x = NULL, y = "Rendimiento (kg/ha, escala log)")
+```
+
+## 25. Tratamiento por winsorización
+
+**Decisiones por variable** (no se elimina ningún valor):
+
+| Variable | Decisión | Justificación |
+|----------|----------|---------------|
+| `sup_sembrada_ha`, `sup_cosechada_ha`, `produccion_tn` | **Conservar** | Los valores altos son departamentos grandes, reales. Se tratarán con transformación logarítmica (Fase 6) |
+| `rendimiento_kg_ha` | **Winsorizar por cultivo** | Los extremos pueden ser errores de registro; se limitan a los límites IQR de su propio cultivo |
+
+La winsorización reemplaza los valores fuera de los límites por el valor del límite (no los borra). Los límites se calculan con
+los valores positivos de cada cultivo y solo si hay al menos 30 registros.
+
+```{r}
+#| label: winsorizar
+winsorizar_iqr <- function(x, k = 1.5, min_n = 30) {
+  pos <- x[!is.na(x) & x > 0]
+  if (length(pos) < min_n) return(x)
+  q <- quantile(pos, c(.25, .75))
+  iqr <- q[[2]] - q[[1]]
+  ifelse(x > 0, pmin(pmax(x, q[[1]] - k * iqr), q[[2]] + k * iqr), x)
+}
+
+datos <- datos |>
+  group_by(cultivo) |>
+  mutate(rendimiento_wins_kg_ha = winsorizar_iqr(rendimiento_kg_ha)) |>
+  ungroup() |>
+  mutate(rend_winsorizado = coalesce(rendimiento_wins_kg_ha != rendimiento_kg_ha, FALSE))
+
+c(filas_modificadas = sum(datos$rend_winsorizado),
+  pct = round(100 * mean(datos$rend_winsorizado), 2))
+```
+
+## 26. Comparación antes y después
+
+```{r}
+#| label: comparacion
+act <- datos |> filter(sup_sembrada_ha > 0, sup_cosechada_ha > 0, produccion_tn > 0)
+
+act |>
+  summarise(
+    across(c(rendimiento_kg_ha, rendimiento_wins_kg_ha),
+           list(media = mean, mediana = median, desv = sd, maximo = max, asimetria = asimetria))
+  ) |>
+  pivot_longer(everything(), names_to = c("variable", "estadistico"),
+               names_pattern = "(rendimiento.*_kg_ha)_(.*)") |>
+  pivot_wider(names_from = variable, values_from = value) |>
+  rename(antes = rendimiento_kg_ha, despues = rendimiento_wins_kg_ha) |>
+  kable(digits = 1, big.mark = ",")
+```
+
+Efecto sobre los resultados por cultivo (los 8 más frecuentes):
+
+```{r}
+#| label: efecto-cultivo
+top8 <- act |> count(cultivo, sort = TRUE) |> head(8) |> pull(cultivo)
+
+act |>
+  filter(cultivo %in% top8) |>
+  group_by(cultivo) |>
+  summarise(media_antes = mean(rendimiento_kg_ha), media_despues = mean(rendimiento_wins_kg_ha),
+            mediana_antes = median(rendimiento_kg_ha), mediana_despues = median(rendimiento_wins_kg_ha),
+            desv_antes = sd(rendimiento_kg_ha), desv_despues = sd(rendimiento_wins_kg_ha)) |>
+  kable(digits = 0, big.mark = ",")
+```
+
+```{r}
+#| label: grafico-comparacion
+act |>
+  filter(cultivo %in% top8) |>
+  select(cultivo, Antes = rendimiento_kg_ha, Después = rendimiento_wins_kg_ha) |>
+  pivot_longer(c(Antes, Después), names_to = "version", values_to = "rend") |>
+  mutate(version = factor(version, levels = c("Antes", "Después"))) |>
+  ggplot(aes(cultivo, rend, fill = version)) +
+  geom_boxplot(outlier.alpha = 0.2, outlier.size = 0.6) +
+  scale_y_log10(labels = comma) +
+  coord_flip() +
+  labs(title = "Rendimiento antes y después de winsorizar", x = NULL,
+       y = "Rendimiento (kg/ha, escala log)", fill = NULL)
+```
+
+**Interpretación (completa con tus resultados):** la mediana casi no cambia, mientras que la media y la desviación estándar
+bajan donde había valores extremos. Esto confirma que el tratamiento reduce la influencia de los extremos sin alterar el centro de los datos.
+
+## Exportación
+
+```{r}
+#| label: exportar
+saveRDS(datos, "data/agricultura_final.rds")
+write_csv(datos, "data/agricultura_final.csv")
+dim(datos)
+```
+
+A partir de la Fase 4 se usa `agricultura_final` (con la columna `rendimiento_wins_kg_ha`).

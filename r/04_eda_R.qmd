@@ -1,0 +1,258 @@
+---
+title: "Fase 4 — Análisis exploratorio y estadístico (R)"
+---
+
+```{r}
+#| label: setup
+library(tidyverse)
+library(knitr)
+library(scales)
+
+theme_set(theme_minimal(base_size = 12))
+
+datos <- readRDS("data/agricultura_final.rds")   # generado en la Fase 3
+
+# Filas con actividad real (para análisis de superficie, producción y rendimiento)
+act <- datos |>
+  filter(sup_sembrada_ha > 0, sup_cosechada_ha > 0, produccion_tn > 0, rendimiento_wins_kg_ha > 0) |>
+  mutate(cultivo_g = fct_lump_n(factor(cultivo), 8))
+
+vars_num <- c("sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_wins_kg_ha")
+```
+
+Preguntas que se responden en esta fase:
+
+1. ¿Cómo evolucionó la producción y el rendimiento entre 1969/70 y 2016/17?
+2. ¿Qué provincias y cultivos concentran más superficie y producción?
+3. ¿Qué tan fuerte es la relación entre superficie cosechada y producción?
+4. ¿Qué cultivos tienen mayor variabilidad en su rendimiento?
+
+## 27. Análisis univariado
+
+```{r}
+#| label: univariado
+act |>
+  select(all_of(vars_num), temperatura_c) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
+  group_by(variable) |>
+  summarise(n = n(), media = mean(valor), mediana = median(valor), desv = sd(valor),
+            cv_pct = 100 * desv / media,
+            asimetria = mean((valor - mean(valor))^3) / sd(valor)^3) |>
+  kable(digits = 1, big.mark = ",")
+```
+
+**Lectura:** superficie y producción son muy asimétricas (por eso se analizan en escala logarítmica);
+la temperatura es simétrica y no presenta asimetría relevante.
+
+## 28. Análisis bivariado
+
+**Superficie cosechada vs. producción** (escala logarítmica):
+
+```{r}
+#| label: bivariado-num
+cor(log(act$sup_cosechada_ha), log(act$produccion_tn))
+```
+
+**Rendimiento según calidad** (variable categórica ordinal):
+
+```{r}
+#| label: bivariado-calidad
+act |>
+  group_by(calidad) |>
+  summarise(n = n(), media = mean(rendimiento_wins_kg_ha), mediana = median(rendimiento_wins_kg_ha)) |>
+  kable(digits = 0, big.mark = ",")
+
+kruskal.test(rendimiento_wins_kg_ha ~ calidad, data = act)
+cor(act$temperatura_c, act$rendimiento_wins_kg_ha, method = "spearman")
+```
+
+Se usa Kruskal-Wallis (no paramétrica) porque el rendimiento no es normal. Un p-valor < 0.05 indica que el rendimiento
+difiere entre niveles de calidad.
+
+## 29. Análisis multivariado (PCA)
+
+El análisis de componentes principales resume la información conjunta de varias variables.
+
+```{r}
+#| label: pca
+X <- act |> transmute(
+  sup_sembrada = log(sup_sembrada_ha), sup_cosechada = log(sup_cosechada_ha),
+  produccion = log(produccion_tn), rendimiento = log(rendimiento_wins_kg_ha),
+  temperatura = temperatura_c
+)
+pca <- prcomp(X, scale. = TRUE)
+
+kable(summary(pca)$importance, digits = 3)   # varianza explicada
+kable(pca$rotation[, 1:2], digits = 3)        # cargas de PC1 y PC2
+```
+
+```{r}
+#| label: pca-grafico
+as_tibble(pca$x[, 1:2]) |>
+  mutate(calidad = act$calidad) |>
+  slice_sample(n = 5000) |>
+  ggplot(aes(PC1, PC2, color = calidad)) +
+  geom_point(alpha = 0.4, size = 0.8) +
+  labs(title = "Componentes principales (muestra de 5,000 registros)", color = "Calidad")
+```
+
+## 30. Frecuencias absolutas y relativas
+
+```{r}
+#| label: frecuencias
+frec <- function(df, v) {
+  df |> count({{ v }}, sort = TRUE) |>
+    mutate(pct = round(100 * n / sum(n), 1), pct_acum = round(cumsum(pct), 1))
+}
+
+kable(frec(datos, calidad))
+kable(head(frec(datos, provincia), 10))
+kable(head(frec(datos, cultivo), 10))
+```
+
+## 31. Tablas de contingencia
+
+```{r}
+#| label: contingencia
+tab <- table(act$cultivo_g, act$calidad)
+kable(tab)
+
+chi <- chisq.test(tab)
+chi
+cramer_v <- sqrt(unname(chi$statistic) / (sum(tab) * (min(dim(tab)) - 1)))
+round(cramer_v, 3)   # fuerza de asociación entre cultivo y calidad (0 a 1)
+```
+
+## 32. Distribuciones y porcentajes por categoría
+
+```{r}
+#| label: porcentajes
+round(prop.table(tab, margin = 1) * 100, 1) |> kable()   # % de calidad dentro de cada cultivo
+
+act |>
+  count(cultivo_g, calidad) |>
+  ggplot(aes(cultivo_g, n, fill = calidad)) +
+  geom_col(position = "fill") +
+  scale_y_continuous(labels = percent) +
+  coord_flip() +
+  labs(title = "Distribución de calidad por cultivo", x = NULL, y = "Porcentaje de registros", fill = "Calidad")
+```
+
+Participación de cada provincia en la **superficie cosechada** total (se usan hectáreas y no toneladas,
+porque sumar toneladas mezcla cultivos de pesos muy distintos):
+
+```{r}
+#| label: participacion-provincia
+act |>
+  group_by(provincia) |>
+  summarise(sup_total_ha = sum(sup_cosechada_ha)) |>
+  mutate(pct = round(100 * sup_total_ha / sum(sup_total_ha), 1)) |>
+  arrange(desc(sup_total_ha)) |>
+  head(10) |>
+  kable(big.mark = ",")
+```
+
+## 33. Tendencia central y dispersión por cultivo
+
+```{r}
+#| label: dispersion-cultivo
+disp_cultivo <- act |>
+  group_by(cultivo) |>
+  filter(n() >= 100) |>
+  summarise(n = n(), media = mean(rendimiento_wins_kg_ha), mediana = median(rendimiento_wins_kg_ha),
+            desv = sd(rendimiento_wins_kg_ha), iqr = IQR(rendimiento_wins_kg_ha),
+            cv_pct = 100 * desv / media) |>
+  arrange(desc(cv_pct))
+
+kable(head(disp_cultivo, 10), digits = 1, big.mark = ",")
+```
+
+El **coeficiente de variación (cv_pct)** permite comparar dispersión entre cultivos con niveles de rendimiento distintos:
+responde la pregunta 4.
+
+## 34. Análisis de correlación
+
+```{r}
+#| label: correlacion
+cor_pearson  <- cor(X, method = "pearson")
+cor_spearman <- cor(X, method = "spearman")
+
+kable(cor_pearson, digits = 2)
+kable(cor_spearman, digits = 2)
+```
+
+Se calculan ambas porque Spearman no depende de la forma de la distribución. Si coinciden, la relación es robusta.
+
+## 35. Matriz y mapa de calor de correlaciones
+
+```{r}
+#| label: heatmap
+cor_spearman |>
+  as.data.frame() |>
+  rownames_to_column("var1") |>
+  pivot_longer(-var1, names_to = "var2", values_to = "r") |>
+  ggplot(aes(var1, var2, fill = r)) +
+  geom_tile() +
+  geom_text(aes(label = round(r, 2)), size = 3.5) +
+  scale_fill_gradient2(low = "#B2182B", mid = "white", high = "#2166AC", limits = c(-1, 1)) +
+  labs(title = "Mapa de calor de correlaciones (Spearman)", x = NULL, y = NULL, fill = "r") +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+## 36. Análisis descriptivo y diagnóstico de patrones
+
+**Tendencias de producción de los cultivos principales:**
+
+```{r}
+#| label: tendencia-produccion
+act |>
+  filter(cultivo %in% c("Soja", "Maiz", "Trigo", "Girasol")) |>
+  group_by(anio_inicio, cultivo) |>
+  summarise(produccion_tn = sum(produccion_tn), .groups = "drop") |>
+  ggplot(aes(anio_inicio, produccion_tn, color = cultivo)) +
+  geom_line() +
+  scale_y_continuous(labels = label_number(scale = 1e-6, suffix = " M")) +
+  labs(title = "Producción nacional por campaña", x = "Año de inicio de campaña",
+       y = "Producción (millones de toneladas)", color = "Cultivo")
+```
+
+**Tendencia del rendimiento por cultivo** (pendiente de una regresión lineal contra el año):
+
+```{r}
+#| label: tendencia-rendimiento
+act |>
+  group_by(cultivo) |>
+  filter(n() >= 100) |>
+  summarise(
+    pendiente_kg_ha_por_anio = coef(lm(rendimiento_wins_kg_ha ~ anio_inicio))[[2]],
+    r2 = summary(lm(rendimiento_wins_kg_ha ~ anio_inicio))$r.squared
+  ) |>
+  arrange(desc(pendiente_kg_ha_por_anio)) |>
+  head(10) |>
+  kable(digits = 2)
+```
+
+**Diferencias entre provincias** (ejemplo con maíz):
+
+```{r}
+#| label: diferencias-provincias
+maiz <- act |> filter(cultivo == "Maiz")
+
+maiz |>
+  group_by(provincia) |>
+  summarise(n = n(), mediana = median(rendimiento_wins_kg_ha)) |>
+  filter(n >= 30) |>
+  arrange(desc(mediana)) |>
+  kable(digits = 0, big.mark = ",")
+
+kruskal.test(rendimiento_wins_kg_ha ~ provincia, data = maiz)
+```
+
+## Conclusiones de la fase
+
+*(Completa con tus resultados.)*
+
+1. **Evolución:** ¿qué cultivos crecen más en producción y rendimiento y cuáles se estancan?
+2. **Concentración:** ¿qué provincias y cultivos concentran la mayor superficie?
+3. **Superficie vs. producción:** ¿qué tan alta es la correlación? (Es esperable que sea muy alta.)
+4. **Variabilidad:** ¿qué cultivos tienen mayor coeficiente de variación y por qué podría ser?
