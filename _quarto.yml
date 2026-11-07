@@ -26,7 +26,10 @@ book:
         - python/04b_eda_python.qmd
     - part: "Fase 5 · Visualización"
       chapters:
+        - r/05_visualizacion_R.
         - r/05_visualizacion_R.qmd
+        - python/05b_interactiva_python.qmd
+        
     # Las siguientes fases se agregarán aquí:
     # - 03_atipicos_R.qmd
     # - 04_eda_R.qmd / 04b_eda_python.qmd

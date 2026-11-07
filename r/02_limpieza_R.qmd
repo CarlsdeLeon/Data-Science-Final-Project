@@ -373,6 +373,26 @@ datos_limpio <- datos |>
   select(-cos_final, -cos_faltante)
 ```
 
+### Diagnóstico de MICE
+
+Se revisa que las imputaciones sean razonables y que el algoritmo haya convergido.
+
+```{r}
+#| label: diagnostico-mice
+#| cache: true
+# Si el método final no fue MICE, se crea aquí para poder hacer el diagnóstico
+if (!exists("imp5")) imp5 <- imp_mice(base_imp, m = 5)
+
+# Densidad de valores observados (azul) vs. imputados (rojo), en escala log
+mice::densityplot(imp5, ~ cos)
+
+# Convergencia: las líneas de las 5 imputaciones deben mezclarse sin tendencia
+plot(imp5, "cos")
+```
+
+**Cómo leerlo:** si las curvas roja y azul tienen formas parecidas, los valores imputados son plausibles.
+En el gráfico de convergencia, las líneas deben entrecruzarse sin subir ni bajar de forma sostenida.
+
 ## 20. Validación antes y después del preprocesamiento
 
 ```{r}

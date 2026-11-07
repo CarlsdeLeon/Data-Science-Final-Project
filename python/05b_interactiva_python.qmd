@@ -1,0 +1,124 @@
+---
+title: "Fase 5 — Visualizaciones interactivas (Python)"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import pandas as pd
+import numpy as np
+import plotly.express as px
+
+datos = pd.read_csv("data/agricultura_final.csv")   # generado en la Fase 3 (R)
+
+act = datos[(datos.sup_sembrada_ha > 0) & (datos.sup_cosechada_ha > 0) &
+            (datos.produccion_tn > 0) & (datos.rendimiento_wins_kg_ha > 0)].copy()
+act["decada"] = (act["anio_inicio"] // 10 * 10).astype(str) + "s"
+
+principales = ["Soja", "Maiz", "Trigo", "Girasol", "Sorgo"]
+```
+
+Paquetes necesarios: `pip install plotly pygwalker`.
+
+## 46. Visualizaciones interactivas con Plotly
+
+Los gráficos de este capítulo permiten pasar el cursor para ver valores, hacer zoom y activar o desactivar series con un clic en la leyenda.
+
+### Evolución del rendimiento nacional
+
+```{python}
+#| label: plotly-lineas
+nacional = (act[act.cultivo.isin(principales)]
+            .groupby(["anio_inicio", "cultivo"])
+            .agg(produccion=("produccion_tn", "sum"), superficie=("sup_cosechada_ha", "sum"))
+            .reset_index())
+nacional["rendimiento_kg_ha"] = nacional["produccion"] / nacional["superficie"] * 1000
+
+fig = px.line(
+    nacional, x="anio_inicio", y="rendimiento_kg_ha", color="cultivo",
+    labels={"anio_inicio": "Año de inicio de campaña", "rendimiento_kg_ha": "Rendimiento (kg/ha)",
+            "cultivo": "Cultivo"},
+    title="Rendimiento nacional por campaña",
+)
+fig.show()
+```
+
+### Superficie vs. producción
+
+```{python}
+#| label: plotly-dispersion
+muestra = act.sample(15000, random_state=2026)
+
+fig = px.scatter(
+    muestra, x="sup_cosechada_ha", y="produccion_tn", color="cultivo",
+    log_x=True, log_y=True, opacity=0.5,
+    hover_data=["provincia", "departamento", "campana"],
+    labels={"sup_cosechada_ha": "Superficie cosechada (ha)", "produccion_tn": "Producción (tn)"},
+    title="Superficie cosechada vs. producción (muestra de 15,000 registros)",
+)
+fig.show()
+```
+
+### Distribución del rendimiento por cultivo
+
+```{python}
+#| label: plotly-box
+fig = px.box(
+    act[act.cultivo.isin(principales)], x="cultivo", y="rendimiento_wins_kg_ha", color="cultivo",
+    labels={"rendimiento_wins_kg_ha": "Rendimiento (kg/ha)", "cultivo": "Cultivo"},
+    title="Rendimiento por cultivo",
+)
+fig.update_layout(showlegend=False)
+fig.show()
+```
+
+### Animación: cómo cambia cada cultivo con el tiempo
+
+Cada burbuja es un cultivo. El eje X es la superficie, el eje Y el rendimiento y el tamaño la producción.
+Usa el botón de reproducción o la barra inferior para avanzar por las campañas.
+
+```{python}
+#| label: plotly-animacion
+anim = (act.groupby(["anio_inicio", "cultivo"])
+        .agg(produccion=("produccion_tn", "sum"), superficie=("sup_cosechada_ha", "sum"))
+        .reset_index())
+anim["rendimiento_kg_ha"] = anim["produccion"] / anim["superficie"] * 1000
+anim = anim[anim.cultivo.isin(act.cultivo.value_counts().head(10).index)].sort_values("anio_inicio")
+
+fig = px.scatter(
+    anim, x="superficie", y="rendimiento_kg_ha", size="produccion", color="cultivo",
+    animation_frame="anio_inicio", log_x=True, log_y=True, size_max=50,
+    range_x=[anim.superficie.min() * 0.8, anim.superficie.max() * 1.2],
+    range_y=[anim.rendimiento_kg_ha.min() * 0.8, anim.rendimiento_kg_ha.max() * 1.2],
+    labels={"superficie": "Superficie cosechada (ha)", "rendimiento_kg_ha": "Rendimiento (kg/ha)"},
+    title="Superficie, rendimiento y producción por campaña",
+)
+fig.show()
+```
+
+## Exploración interactiva con PyGWalker
+
+PyGWalker permite arrastrar variables a ejes y colores, como en una herramienta de BI, sin escribir código.
+Se usa una muestra de 5,000 registros para que el capítulo siga siendo liviano.
+
+```{python}
+#| label: pygwalker
+try:
+    import pygwalker as pyg
+    from IPython.display import HTML, display
+
+    columnas = ["provincia", "cultivo", "campana", "anio_inicio", "calidad", "temperatura_c",
+                "sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_wins_kg_ha"]
+    display(HTML(pyg.to_html(act.sample(5000, random_state=2026)[columnas])))
+except ImportError:
+    print("PyGWalker no está instalado. Ejecuta: pip install pygwalker")
+```
+
+## Interpretación y conclusiones
+
+*(Completa con lo que observes al explorar los gráficos.)*
+
+- **Rendimiento nacional:** ¿qué cultivos muestran una mejora sostenida y desde qué campaña?
+- **Superficie vs. producción:** ¿qué cultivos se salen de la nube principal y por qué?
+- **Animación:** ¿qué cultivos se desplazan más hacia arriba (mayor rendimiento) o a la derecha (mayor superficie)?
+- **PyGWalker:** describe al menos una relación nueva que hayas encontrado explorando.

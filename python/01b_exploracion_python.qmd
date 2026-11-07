@@ -14,6 +14,17 @@ pd.set_option("display.max_columns", None)
 ruta = "data/agricultura.csv"   # ajusta si tu archivo está en otra carpeta
 ```
 
+## Planteamiento analítico inicial
+
+Preguntas que guiarán todo el proyecto (las mismas que en R):
+
+1. ¿Cómo evolucionaron la superficie sembrada, la producción y el rendimiento entre 1969/70 y 2016/17?
+2. ¿Qué provincias y cultivos concentran la mayor superficie y producción?
+3. ¿Qué tan fuerte es la relación entre superficie cosechada y producción?
+4. ¿Qué cultivos tienen mayor variabilidad en su rendimiento?
+5. ¿Se puede **predecir el rendimiento (kg/ha)** a partir de superficie, cultivo, provincia y campaña? *(regresión, Fase 7)*
+6. ¿Se puede **clasificar la calidad** (Baja / Promedio / Alta) a partir de las demás variables? *(clasificación multiclase, Fase 7)*
+
 ## Importación de datos
 
 Lectura directa, sin ajustes:
@@ -43,6 +54,36 @@ miles = ["sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_kg
 datos[enteras] = datos[enteras].astype(int)
 for c in miles:
     datos[c] = pd.to_numeric(datos[c].str.replace(".", "", regex=False))
+```
+
+## Creación y manipulación de DataFrames
+
+```{python}
+#| label: dataframes
+# Crear un DataFrame desde un diccionario
+tipos_cultivo = pd.DataFrame({
+    "cultivo": ["Soja", "Maiz", "Trigo"],
+    "tipo": ["Oleaginosa", "Cereal", "Cereal"],
+})
+display(tipos_cultivo)
+
+# Crear un DataFrame nuevo a partir de los datos: catálogo de cultivos
+catalogo_cultivos = (datos[["id_cultivo", "cultivo"]]
+                     .drop_duplicates()
+                     .sort_values("id_cultivo")
+                     .reset_index(drop=True))
+display(catalogo_cultivos.head())
+
+# Crear una columna nueva y resumir por grupo (assign no modifica el DataFrame original)
+resumen = (datos.assign(rendimiento_t_ha=datos["rendimiento_kg_ha"] / 1000)
+           .groupby("cultivo")
+           .agg(registros=("cultivo", "size"), rend_medio_t_ha=("rendimiento_t_ha", "mean"))
+           .sort_values("registros", ascending=False)
+           .head(8))
+display(resumen)
+
+# Selección de filas y columnas
+display(datos.loc[datos["cultivo"] == "Soja", ["provincia", "departamento", "campana", "produccion_tn"]].head())
 ```
 
 ## Estructura del DataFrame
