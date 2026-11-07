@@ -1,0 +1,384 @@
+---
+title: "Fase 7 — Modelado predictivo y evaluación (Python)"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import os
+import numpy as np
+import pandas as pd
+import joblib
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.base import clone
+from sklearn.pipeline import Pipeline
+from sklearn.dummy import DummyRegressor, DummyClassifier
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.inspection import permutation_importance
+from sklearn.preprocessing import label_binarize
+from sklearn.metrics import (mean_squared_error, mean_absolute_error, r2_score,
+                             accuracy_score, f1_score, roc_auc_score, roc_curve,
+                             auc, ConfusionMatrixDisplay)
+from xgboost import XGBRegressor
+
+sns.set_theme(style="whitegrid")
+pd.set_option("display.float_format", "{:,.3f}".format)
+
+OBJ_REG = "rendimiento_wins_kg_ha"
+OBJ_CLF = "calidad"
+
+# Particiones y recetas generadas en la Fase 6
+reg_train = pd.read_csv("data/ml/reg_train.csv"); reg_test = pd.read_csv("data/ml/reg_test.csv")
+clf_train = pd.read_csv("data/ml/clf_train.csv"); clf_test = pd.read_csv("data/ml/clf_test.csv")
+
+Xr_tr, yr_tr = reg_train.drop(columns=OBJ_REG), reg_train[OBJ_REG]
+Xr_te, yr_te = reg_test.drop(columns=OBJ_REG), reg_test[OBJ_REG]
+Xc_tr, yc_tr = clf_train.drop(columns=OBJ_CLF), clf_train[OBJ_CLF]
+Xc_te, yc_te = clf_test.drop(columns=OBJ_CLF), clf_test[OBJ_CLF]
+
+preproc_reg = joblib.load("data/ml/preproc_reg.joblib")
+preproc_clf = joblib.load("data/ml/preproc_clf.joblib")
+
+print(f"Entrenamiento: {len(reg_train):,} | Prueba: {len(reg_test):,}")
+```
+
+Paquetes necesarios: `pip install scikit-learn xgboost joblib`.
+
+Todos los modelos de este capítulo se entrenan con el mismo conjunto de entrenamiento y se evalúan con **el mismo conjunto de prueba**
+(tema 63). El preprocesamiento va dentro de cada `Pipeline`, así que se ajusta solo con entrenamiento.
+
+# Problema 1: regresión del rendimiento
+
+## 55. Modelos de referencia (baseline)
+
+Un modelo complejo solo vale la pena si supera a estas referencias simples:
+
+- **Media global:** predice siempre el rendimiento medio.
+- **Media por cultivo:** predice el rendimiento medio del cultivo (un baseline más exigente).
+
+```{python}
+#| label: funciones-reg
+def evaluar_reg(nombre, y_real, y_pred):
+    return {"modelo": nombre,
+            "RMSE": np.sqrt(mean_squared_error(y_real, y_pred)),
+            "MAE": mean_absolute_error(y_real, y_pred),
+            "R2": r2_score(y_real, y_pred)}
+
+def pipe_reg(estimador):
+    return Pipeline([("prep", clone(preproc_reg)), ("modelo", estimador)])
+
+resultados_reg = []
+
+pred = DummyRegressor(strategy="mean").fit(Xr_tr, yr_tr).predict(Xr_te)
+resultados_reg.append(evaluar_reg("Baseline: media global", yr_te, pred))
+
+media_cultivo = yr_tr.groupby(Xr_tr["cultivo"]).mean()
+pred = Xr_te["cultivo"].map(media_cultivo).fillna(yr_tr.mean())
+resultados_reg.append(evaluar_reg("Baseline: media por cultivo", yr_te, pred))
+
+pd.DataFrame(resultados_reg)
+```
+
+## 56. Regresión lineal
+
+```{python}
+#| label: lineal
+modelos_reg = {}
+modelos_reg["Regresión lineal"] = pipe_reg(LinearRegression()).fit(Xr_tr, yr_tr)
+resultados_reg.append(evaluar_reg("Regresión lineal", yr_te, modelos_reg["Regresión lineal"].predict(Xr_te)))
+resultados_reg[-1]
+```
+
+## 57. Random Forest
+
+```{python}
+#| label: random-forest
+#| cache: true
+modelos_reg["Random Forest"] = pipe_reg(
+    RandomForestRegressor(n_estimators=150, min_samples_leaf=5, n_jobs=-1, random_state=2026)
+).fit(Xr_tr, yr_tr)
+resultados_reg.append(evaluar_reg("Random Forest", yr_te, modelos_reg["Random Forest"].predict(Xr_te)))
+resultados_reg[-1]
+```
+
+## 58. XGBoost para regresión
+
+```{python}
+#| label: xgboost
+#| cache: true
+modelos_reg["XGBoost"] = pipe_reg(
+    XGBRegressor(n_estimators=400, learning_rate=0.08, max_depth=7, subsample=0.8,
+                 colsample_bytree=0.8, tree_method="hist", n_jobs=-1, random_state=2026)
+).fit(Xr_tr, yr_tr)
+resultados_reg.append(evaluar_reg("XGBoost", yr_te, modelos_reg["XGBoost"].predict(Xr_te)))
+resultados_reg[-1]
+```
+
+## 64. Evaluación de regresión: RMSE y R²
+
+*(Los temas 59 a 62 corresponden a clasificación y están en la segunda parte del capítulo.)*
+
+```{python}
+#| label: tabla-regresion
+tabla_reg = pd.DataFrame(resultados_reg).sort_values("RMSE").reset_index(drop=True)
+tabla_reg
+```
+
+- **RMSE y MAE** están en kg/ha: son el error típico de las predicciones. Menor es mejor.
+- **R²** es la proporción de variabilidad del rendimiento que explica el modelo. Mayor es mejor (1 es perfecto; 0 equivale a predecir la media).
+
+```{python}
+#| label: grafico-regresion
+fig, ax = plt.subplots(1, 2, figsize=(11, 4))
+sns.barplot(data=tabla_reg, y="modelo", x="RMSE", ax=ax[0], color="#3A7CA5")
+ax[0].set_title("RMSE por modelo (kg/ha)")
+sns.barplot(data=tabla_reg, y="modelo", x="R2", ax=ax[1], color="#2E6F40")
+ax[1].set_title("R² por modelo")
+plt.tight_layout(); plt.show()
+```
+
+```{python}
+#| label: real-vs-predicho
+nombre_mejor_reg = tabla_reg.loc[~tabla_reg.modelo.str.startswith("Baseline"), "modelo"].iloc[0]
+mejor_reg = modelos_reg[nombre_mejor_reg]
+y_pred = mejor_reg.predict(Xr_te)
+
+muestra = np.random.default_rng(2026).choice(len(yr_te), 4000, replace=False)
+fig, ax = plt.subplots(1, 2, figsize=(11, 4))
+
+ax[0].scatter(yr_te.iloc[muestra], y_pred[muestra], alpha=0.3, s=8)
+lim = [0, max(yr_te.max(), y_pred.max())]
+ax[0].plot(lim, lim, color="red", lw=1)
+ax[0].set_xlabel("Rendimiento real (kg/ha)"); ax[0].set_ylabel("Rendimiento predicho (kg/ha)")
+ax[0].set_title(f"Real vs. predicho — {nombre_mejor_reg}")
+
+sns.histplot(yr_te.values - y_pred, bins=50, ax=ax[1])
+ax[1].set_xlabel("Error (real − predicho, kg/ha)"); ax[1].set_title("Distribución de los errores")
+plt.tight_layout(); plt.show()
+```
+
+# Problema 2: clasificación de la calidad
+
+La variable `calidad` tiene **3 clases** (Baja, Promedio, Alta), por lo que es un problema multiclase.
+
+## 55 (clasificación). Modelo de referencia
+
+```{python}
+#| label: funciones-clf
+def pipe_clf(estimador):
+    return Pipeline([("prep", clone(preproc_clf)), ("modelo", estimador)])
+
+def evaluar_clf(nombre, modelo):
+    pred = modelo.predict(Xc_te)
+    proba = modelo.predict_proba(Xc_te)
+    return {"modelo": nombre,
+            "Accuracy": accuracy_score(yc_te, pred),
+            "F1_macro": f1_score(yc_te, pred, average="macro"),
+            "AUC_macro_OvR": roc_auc_score(yc_te, proba, multi_class="ovr", average="macro")}
+
+modelos_clf = {}
+resultados_clf = []
+
+# El baseline predice siempre la clase más frecuente
+base_clf = pipe_clf(DummyClassifier(strategy="prior")).fit(Xc_tr, yc_tr)
+resultados_clf.append(evaluar_clf("Baseline: clase más frecuente", base_clf))
+resultados_clf[-1]
+```
+
+## 59. Regresión logística
+
+```{python}
+#| label: logistica
+modelos_clf["Regresión logística"] = pipe_clf(LogisticRegression(max_iter=1000)).fit(Xc_tr, yc_tr)
+resultados_clf.append(evaluar_clf("Regresión logística", modelos_clf["Regresión logística"]))
+resultados_clf[-1]
+```
+
+## 60. Naive Bayes
+
+Se usa Naive Bayes Gaussiano. Supone que las variables son independientes y con distribución normal dentro de cada clase;
+es una simplificación fuerte (sobre todo con variables one-hot), pero sirve de comparación.
+
+```{python}
+#| label: naive-bayes
+modelos_clf["Naive Bayes"] = pipe_clf(GaussianNB()).fit(Xc_tr, yc_tr)
+resultados_clf.append(evaluar_clf("Naive Bayes", modelos_clf["Naive Bayes"]))
+resultados_clf[-1]
+```
+
+## 61. Árbol de decisión
+
+```{python}
+#| label: arbol
+modelos_clf["Árbol de decisión"] = pipe_clf(
+    DecisionTreeClassifier(max_depth=8, min_samples_leaf=50, random_state=2026)
+).fit(Xc_tr, yc_tr)
+resultados_clf.append(evaluar_clf("Árbol de decisión", modelos_clf["Árbol de decisión"]))
+resultados_clf[-1]
+```
+
+Primeros niveles del árbol (para interpretar qué variables usa para decidir):
+
+```{python}
+#| label: arbol-grafico
+#| fig-width: 12
+#| fig-height: 6
+pipe_arbol = modelos_clf["Árbol de decisión"]
+plt.figure(figsize=(12, 6))
+plot_tree(pipe_arbol.named_steps["modelo"], max_depth=2, filled=True, fontsize=8,
+          feature_names=pipe_arbol.named_steps["prep"].get_feature_names_out(),
+          class_names=list(pipe_arbol.named_steps["modelo"].classes_))
+plt.show()
+```
+
+## 62. Clasificación multiclase con One-vs-Rest
+
+Como `calidad` tiene 3 clases, se puede entrenar **un clasificador binario por clase** ("esta clase contra las otras dos") y elegir la clase con mayor probabilidad.
+Se compara contra la regresión logística multinomial del tema 59.
+
+```{python}
+#| label: one-vs-rest
+modelos_clf["Logística One-vs-Rest"] = pipe_clf(
+    OneVsRestClassifier(LogisticRegression(max_iter=1000))
+).fit(Xc_tr, yc_tr)
+resultados_clf.append(evaluar_clf("Logística One-vs-Rest", modelos_clf["Logística One-vs-Rest"]))
+resultados_clf[-1]
+```
+
+## 63. Comparación de modelos sobre los mismos datos de prueba
+
+```{python}
+#| label: tabla-clasificacion
+tabla_clf = pd.DataFrame(resultados_clf).sort_values("AUC_macro_OvR", ascending=False).reset_index(drop=True)
+tabla_clf
+```
+
+```{python}
+#| label: grafico-clasificacion
+tabla_clf.melt(id_vars="modelo", var_name="metrica", value_name="valor").pipe(
+    lambda d: sns.catplot(data=d, y="modelo", x="valor", col="metrica", kind="bar",
+                          color="#3A7CA5", height=3.5, aspect=1.1, sharex=False)
+)
+plt.show()
+```
+
+Un AUC de 0.5 equivale a adivinar. Si todos los modelos se parecen al baseline, significa que la calidad **no se puede predecir** con estas variables,
+y eso también es un resultado válido que debe reportarse.
+
+## 65. Curvas ROC y AUC
+
+Para clasificación multiclase se dibuja una curva ROC por clase ("esa clase contra el resto").
+
+```{python}
+#| label: curvas-roc
+#| fig-width: 12
+#| fig-height: 4
+top3 = tabla_clf.loc[~tabla_clf.modelo.str.startswith("Baseline"), "modelo"].head(3).tolist()
+
+fig, axes = plt.subplots(1, len(top3), figsize=(4.2 * len(top3), 4), sharey=True)
+axes = np.atleast_1d(axes)
+
+for ax, nombre in zip(axes, top3):
+    modelo = modelos_clf[nombre]
+    clases = modelo.classes_
+    proba = modelo.predict_proba(Xc_te)
+    y_bin = label_binarize(yc_te, classes=clases)
+    for i, clase in enumerate(clases):
+        fpr, tpr, _ = roc_curve(y_bin[:, i], proba[:, i])
+        ax.plot(fpr, tpr, label=f"{clase} (AUC = {auc(fpr, tpr):.2f})")
+    ax.plot([0, 1], [0, 1], "k--", lw=1)
+    ax.set_title(nombre, fontsize=10)
+    ax.set_xlabel("Tasa de falsos positivos")
+    ax.legend(fontsize=8)
+axes[0].set_ylabel("Tasa de verdaderos positivos")
+plt.tight_layout(); plt.show()
+```
+
+```{python}
+#| label: matriz-confusion
+nombre_mejor_clf = top3[0]
+mejor_clf = modelos_clf[nombre_mejor_clf]
+
+ConfusionMatrixDisplay.from_estimator(
+    mejor_clf, Xc_te, yc_te, normalize="true", cmap="Blues", values_format=".2f"
+)
+plt.title(f"Matriz de confusión normalizada — {nombre_mejor_clf}")
+plt.show()
+```
+
+# Selección, interpretación y uso del mejor modelo
+
+## 66. Selección, interpretación, guardado y predicciones nuevas
+
+**Selección:** para regresión se elige el menor RMSE y para clasificación el mayor AUC macro, siempre entre modelos reales (no baselines).
+
+```{python}
+#| label: seleccion
+print("Mejor regresor:", nombre_mejor_reg)
+print("Mejor clasificador:", nombre_mejor_clf)
+```
+
+**Interpretación del regresor** con importancia por permutación: cuánto empeora el error si se "desordena" cada variable.
+
+```{python}
+#| label: importancia
+#| cache: true
+idx = Xr_te.sample(5000, random_state=2026).index
+imp = permutation_importance(mejor_reg, Xr_te.loc[idx], yr_te.loc[idx], n_repeats=5,
+                             scoring="neg_root_mean_squared_error", random_state=2026, n_jobs=-1)
+
+importancias = pd.Series(imp.importances_mean, index=Xr_te.columns).sort_values()
+importancias.plot(kind="barh", figsize=(7, 3.5), color="#3A7CA5")
+plt.xlabel("Aumento del RMSE al desordenar la variable (kg/ha)")
+plt.title(f"Importancia de variables — {nombre_mejor_reg}")
+plt.show()
+```
+
+**Guardado del mejor modelo:**
+
+```{python}
+#| label: guardar
+os.makedirs("outputs/modelos", exist_ok=True)
+joblib.dump(mejor_reg, "outputs/modelos/mejor_modelo_rendimiento.joblib")
+joblib.dump(mejor_clf, "outputs/modelos/mejor_modelo_calidad.joblib")
+
+tabla_reg.to_csv("outputs/comparacion_regresion.csv", index=False)
+tabla_clf.to_csv("outputs/comparacion_clasificacion.csv", index=False)
+```
+
+**Uso del modelo guardado con datos nuevos:**
+
+```{python}
+#| label: predicciones-nuevas
+modelo_guardado = joblib.load("outputs/modelos/mejor_modelo_rendimiento.joblib")
+
+nuevos = pd.DataFrame({
+    "sup_sembrada_ha": [5000, 1200, 800],
+    "temperatura_c": [24, 27, 22],
+    "anio_inicio": [2017, 2017, 2017],
+    "cultivo": ["Soja", "Maiz", "Trigo"],
+    "provincia": ["CORDOBA", "SANTA FE", "BUENOS AIRES"],
+})
+nuevos["rendimiento_predicho_kg_ha"] = modelo_guardado.predict(nuevos)
+nuevos
+```
+
+Los nombres de cultivo y provincia deben escribirse igual que en el dataset (provincias en mayúsculas y sin acentos).
+Un valor desconocido no genera error: se codifica como categoría infrecuente.
+
+## Conclusiones y limitaciones
+
+*(Completa con tus resultados.)*
+
+- **Regresión:** ¿qué modelo ganó y cuánto mejora respecto al baseline por cultivo? ¿Qué variables fueron más importantes?
+- **Clasificación:** ¿algún modelo supera claramente al baseline? Si el AUC es cercano a 0.5, la calidad no se explica con estas variables.
+- **Limitaciones:**
+    - la partición aleatoria puede ser optimista porque el mismo departamento aparece en entrenamiento y prueba;
+    - se excluyeron las filas imputadas y los ceros, por lo que el modelo solo aplica a cultivos con producción;
+    - el objetivo de regresión es el rendimiento winsorizado, no el original;
+    - Naive Bayes Gaussiano asume independencia y normalidad, supuestos que aquí no se cumplen.

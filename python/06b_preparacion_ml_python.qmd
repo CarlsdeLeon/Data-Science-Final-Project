@@ -1,0 +1,258 @@
+---
+title: "Fase 6 — Preparación para aprendizaje automático (Python)"
+jupyter: python3
+---
+
+```{python}
+#| label: setup
+import os
+import numpy as np
+import pandas as pd
+import joblib
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import skew
+from sklearn.base import clone
+from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, FunctionTransformer
+from sklearn.feature_selection import mutual_info_regression
+
+sns.set_theme(style="whitegrid")
+pd.set_option("display.float_format", "{:,.3f}".format)
+os.makedirs("data/ml", exist_ok=True)
+
+datos = pd.read_csv("data/agricultura_final.csv")   # generado en la Fase 3 (R)
+```
+
+Paquetes necesarios: `pip install scikit-learn joblib`.
+
+## 47. Definición del problema predictivo y variable objetivo
+
+Se plantean **dos problemas**, que responden las preguntas 5 y 6 de la Fase 1:
+
+| | Problema 1: regresión | Problema 2: clasificación |
+|---|---|---|
+| **Qué se predice** | Rendimiento (`rendimiento_wins_kg_ha`) | Calidad (`calidad`: Baja, Promedio, Alta) |
+| **Tipo** | Regresión | Clasificación multiclase (3 clases) |
+| **Por qué** | Anticipar la productividad de un cultivo en una zona y campaña sirve para planificar y detectar zonas con bajo desempeño | Comprobar si la calidad registrada se puede explicar con las características del cultivo, la zona y el año |
+| **Métricas** | RMSE y R² | Accuracy, F1 macro, curvas ROC y AUC |
+
+**Conjunto de modelado.** Solo se usan filas donde los datos son **observados y no derivados de una imputación**:
+
+- superficie sembrada, cosechada y producción mayores a 0,
+- sin las filas de superficie cosechada imputada (Fase 2), para no entrenar con valores sintéticos, y especialmente para que el rendimiento objetivo no sea un valor calculado a partir de una imputación.
+
+```{python}
+#| label: conjunto-modelado
+base = datos[
+    (datos.sup_sembrada_ha > 0) & (datos.sup_cosechada_ha > 0) &
+    (datos.produccion_tn > 0) & (datos.rendimiento_wins_kg_ha > 0) &
+    (~datos.sup_cosechada_imputada.astype(bool))
+].reset_index(drop=True)
+
+OBJ_REG = "rendimiento_wins_kg_ha"
+OBJ_CLF = "calidad"
+
+print(f"Filas del dataset final: {len(datos):,} | Filas para modelado: {len(base):,}")
+display(base[OBJ_REG].describe().to_frame().T)
+display((base[OBJ_CLF].value_counts(normalize=True) * 100).round(1).to_frame("% de registros"))
+```
+
+## 48. Selección de variables predictoras
+
+| Variable | ¿Predictora? | Justificación |
+|---|---|---|
+| `cultivo` | Sí | Es el principal determinante del rendimiento |
+| `provincia` | Sí | Resume clima y suelo a nivel regional (23 categorías) |
+| `anio_inicio` | Sí | Captura el progreso tecnológico en el tiempo |
+| `temperatura_c` | Sí | Variable ambiental disponible |
+| `sup_sembrada_ha` | Sí | Escala de la explotación |
+| `sup_cosechada_ha`, `produccion_tn` | **Solo en clasificación** | En regresión **causan fuga de información**: el rendimiento se calcula como producción ÷ superficie cosechada × 1000 |
+| `departamento` | No | Cerca de 500 categorías, riesgo de sobreajuste |
+| `campana`, `id_*`, `clave_departamento` | No | Redundantes o sin significado numérico |
+
+```{python}
+#| label: variables
+cat = ["cultivo", "provincia"]
+num_lin = ["temperatura_c", "anio_inicio"]
+
+feat_reg = ["sup_sembrada_ha"] + num_lin + cat
+feat_clf = ["sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_wins_kg_ha"] + num_lin + cat
+```
+
+## 49. Codificación de variables categóricas
+
+`cultivo` (32 categorías) y `provincia` (23) son nominales, sin orden natural, por lo que se usa **codificación one-hot**.
+Las categorías con menos de 50 registros se agrupan en una sola categoría "infrecuente" para evitar columnas casi vacías.
+
+```{python}
+#| label: codificacion
+print("Cultivos:", base["cultivo"].nunique(), "| Provincias:", base["provincia"].nunique())
+print("Cultivos con menos de 50 registros:", int((base["cultivo"].value_counts() < 50).sum()))
+
+# Ejemplo de cómo se ve el one-hot
+enc = OneHotEncoder(sparse_output=False)
+ejemplo = base[["cultivo"]].drop_duplicates().head(4).reset_index(drop=True)
+pd.concat([ejemplo, pd.DataFrame(enc.fit_transform(ejemplo), columns=enc.get_feature_names_out())], axis=1)
+```
+
+La variable objetivo `calidad` no necesita codificación manual: los clasificadores de scikit-learn aceptan etiquetas de texto.
+
+## 50. Normalización o estandarización
+
+Se **estandariza** (media 0, desviación 1) con `StandardScaler`. Es necesario para la regresión lineal y logística, que son sensibles a la escala.
+Los modelos de árboles no la necesitan, pero tampoco se ven afectados, así que se usa el mismo preprocesamiento para todos.
+
+## 51. Transformaciones logarítmicas
+
+Superficie y producción tienen distribuciones muy asimétricas (Fase 3). Se justifica `log(1 + x)`:
+
+```{python}
+#| label: asimetria
+vars_log = ["sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_wins_kg_ha"]
+pd.DataFrame({
+    "asimetria_antes": [skew(base[v]) for v in vars_log],
+    "asimetria_despues_log": [skew(np.log1p(base[v])) for v in vars_log],
+}, index=vars_log)
+```
+
+```{python}
+#| label: grafico-log
+fig, ax = plt.subplots(1, 2, figsize=(10, 3.5))
+sns.histplot(base["sup_sembrada_ha"], bins=40, ax=ax[0]); ax[0].set_title("Original")
+sns.histplot(np.log1p(base["sup_sembrada_ha"]), bins=40, ax=ax[1]); ax[1].set_title("log(1 + x)")
+for a in ax: a.set_xlabel("Superficie sembrada (ha)")
+plt.tight_layout(); plt.show()
+```
+
+Una asimetría cercana a 0 después del logaritmo confirma que la transformación es adecuada.
+
+## 52. División en entrenamiento y prueba
+
+Se separa **80% / 20%**, estratificando por `calidad` para mantener la proporción de clases. La misma partición se usa para
+los dos problemas, de modo que los modelos se comparan sobre las mismas filas.
+
+```{python}
+#| label: split
+idx_train, idx_test = train_test_split(
+    base.index, test_size=0.20, random_state=2026, stratify=base[OBJ_CLF]
+)
+
+reg_train, reg_test = base.loc[idx_train, feat_reg + [OBJ_REG]], base.loc[idx_test, feat_reg + [OBJ_REG]]
+clf_train, clf_test = base.loc[idx_train, feat_clf + [OBJ_CLF]], base.loc[idx_test, feat_clf + [OBJ_CLF]]
+
+print(f"Entrenamiento: {len(idx_train):,} | Prueba: {len(idx_test):,}")
+display(pd.concat([
+    clf_train[OBJ_CLF].value_counts(normalize=True).rename("entrenamiento"),
+    clf_test[OBJ_CLF].value_counts(normalize=True).rename("prueba"),
+], axis=1).mul(100).round(1))
+```
+
+**Verificación de la selección de variables (solo con entrenamiento):** información mutua entre cada predictora y el rendimiento.
+
+```{python}
+#| label: info-mutua
+Xmi = reg_train[feat_reg].copy()
+for c in cat:
+    Xmi[c] = Xmi[c].astype("category").cat.codes
+muestra = Xmi.sample(20000, random_state=2026)
+
+mi = mutual_info_regression(
+    muestra, reg_train.loc[muestra.index, OBJ_REG],
+    discrete_features=[c in cat for c in muestra.columns], random_state=2026
+)
+pd.Series(mi, index=muestra.columns).sort_values(ascending=False).to_frame("informacion_mutua")
+```
+
+Una información mutua más alta indica que la variable aporta más al rendimiento. Si una predictora cercana a 0 no aporta,
+se puede considerar eliminarla.
+
+```{python}
+#| label: guardar-splits
+reg_train.to_csv("data/ml/reg_train.csv", index=False)
+reg_test.to_csv("data/ml/reg_test.csv", index=False)
+clf_train.to_csv("data/ml/clf_train.csv", index=False)
+clf_test.to_csv("data/ml/clf_test.csv", index=False)
+```
+
+## 53. Flujos de preprocesamiento (pipelines)
+
+Todo el preprocesamiento se define como un `ColumnTransformer` (la "receta"). Se usará dentro de un `Pipeline` junto con cada modelo
+en la Fase 7, de modo que **cada transformación se ajusta solo con los datos de entrenamiento**.
+
+```{python}
+#| label: recetas
+def numerica_log():
+    return Pipeline([
+        ("log", FunctionTransformer(np.log1p, feature_names_out="one-to-one")),
+        ("estandarizar", StandardScaler()),
+    ])
+
+categorica = OneHotEncoder(handle_unknown="infrequent_if_exist", min_frequency=50, sparse_output=False)
+
+preproc_reg = ColumnTransformer([
+    ("num_log", numerica_log(), ["sup_sembrada_ha"]),
+    ("num", StandardScaler(), num_lin),
+    ("cat", categorica, cat),
+], verbose_feature_names_out=False)
+
+preproc_clf = ColumnTransformer([
+    ("num_log", numerica_log(), ["sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_wins_kg_ha"]),
+    ("num", StandardScaler(), num_lin),
+    ("cat", clone(categorica), cat),
+], verbose_feature_names_out=False)
+
+# Se guardan las recetas SIN ajustar; la Fase 7 las ajustará con el entrenamiento
+joblib.dump(clone(preproc_reg), "data/ml/preproc_reg.joblib")
+joblib.dump(clone(preproc_clf), "data/ml/preproc_clf.joblib")
+```
+
+Demostración sobre el problema de regresión:
+
+```{python}
+#| label: demo-receta
+X_tr = preproc_reg.fit_transform(reg_train[feat_reg])   # fit SOLO con entrenamiento
+X_te = preproc_reg.transform(reg_test[feat_reg])        # prueba: solo transform
+
+nombres = preproc_reg.get_feature_names_out()
+print("Matriz de entrenamiento:", X_tr.shape, "| Matriz de prueba:", X_te.shape)
+print("Primeras columnas:", list(nombres[:6]))
+
+pd.concat([
+    pd.DataFrame(X_tr[:, :3], columns=nombres[:3]).agg(["mean", "std"]).add_prefix("train_"),
+    pd.DataFrame(X_te[:, :3], columns=nombres[:3]).agg(["mean", "std"]).add_prefix("test_"),
+], axis=1).T
+```
+
+La media y desviación del entrenamiento son exactamente 0 y 1. Las de prueba son parecidas pero **no idénticas**,
+lo cual es la señal de que el escalador no "vio" los datos de prueba.
+
+## 54. Prevención de fuga de información
+
+Medidas aplicadas:
+
+1. **Fuga del objetivo:** en regresión no se usan `produccion_tn`, `sup_cosechada_ha` ni el rendimiento original, porque el rendimiento se calcula a partir de ellos.
+2. **Fuga por preprocesamiento:** escalado y codificación se ajustan solo con entrenamiento, mediante pipelines.
+3. **Selección de variables:** la verificación de información mutua usa solo datos de entrenamiento.
+4. **Filas sintéticas:** se excluyeron las filas imputadas.
+
+```{python}
+#| label: verificaciones
+prohibidas_reg = {"produccion_tn", "sup_cosechada_ha", "rendimiento_kg_ha", "rendimiento_wins_kg_ha"}
+
+assert prohibidas_reg.isdisjoint(feat_reg), "Hay variables que filtran el objetivo en regresión"
+assert OBJ_CLF not in feat_clf and OBJ_REG not in feat_reg
+assert set(reg_train.index).isdisjoint(reg_test.index), "Filas repetidas entre entrenamiento y prueba"
+print("Verificaciones superadas")
+```
+
+**Limitación a considerar:** el dataset es un panel (el mismo departamento aparece en muchos años), por lo que una partición aleatoria
+pone departamentos "parecidos" en entrenamiento y prueba. Esto puede hacer que el desempeño sea algo optimista. Una validación más estricta
+dividiría por años (entrenar con campañas antiguas y probar con las recientes).
+
+## Conclusión de la fase
+
+*(Completa con tus resultados.)* Los datos quedan listos: ~80% para entrenamiento y ~20% para prueba, con recetas de
+preprocesamiento guardadas en `data/ml/`. Se definieron dos objetivos: **predecir el rendimiento** (regresión) y **clasificar la calidad** (multiclase).

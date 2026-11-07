@@ -29,6 +29,12 @@ book:
         - r/05_visualizacion_R.
         - r/05_visualizacion_R.qmd
         - python/05b_interactiva_python.qmd
+    - part: "Fase 6 · Preparación para ML"
+      chapters:
+        - python/06b_preparacion_ml_python.qmd
+    - part: "Fase 7 · Modelado"
+      chapters:
+        - python/07b_modelado_python.qmd
         
     # Las siguientes fases se agregarán aquí:
     # - 03_atipicos_R.qmd
