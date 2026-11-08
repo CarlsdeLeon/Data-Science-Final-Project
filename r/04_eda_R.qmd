@@ -22,7 +22,7 @@ library(tidyverse)
 library(knitr)
 library(scales)
 
-theme_set(theme_minimal(base_size = 12))
+source("r/tema.R")  # Tema, colores y configuración del proyecto.
 
 # Valor predeterminado si tema.R no define usar_imputadas.
 if (!exists("usar_imputadas")) {
