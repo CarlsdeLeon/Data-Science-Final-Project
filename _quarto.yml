@@ -37,7 +37,8 @@ book:
 
 format:
   html:
-    theme: [cosmo, styles.css]
+    theme: cosmo
+    css: styles.css
     toc: true
     toc-depth: 3
     code-fold: true

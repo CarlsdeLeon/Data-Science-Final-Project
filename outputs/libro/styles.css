@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
+h1, h2, h3 { font-weight: 700; letter-spacing: -0.01em; }
+h2 { border-bottom: 2px solid #2E6F40; padding-bottom: .25rem; margin-top: 2.4rem; }
+
+/* Tablas */
+table { font-size: .85rem; }
+thead th { background: #2E6F40; color: #fff !important; }
+tbody tr:nth-of-type(even) { background: #f4f8f5; }
+.cell-output-display { overflow-x: auto; }
+
+/* Cajas de aviso y código */
+.callout { border-radius: 8px; }
+div.sourceCode { border-radius: 8px; }
+
+/* Gráficos */
+.cell-output-display img, figure img { border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.12); }
