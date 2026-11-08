@@ -10,6 +10,7 @@ library(naniar)   # patrones de datos faltantes y prueba de Little
 library(mice)     # imputación múltiple
 library(VIM)      # imputación KNN
 
+source("r/tema.R")   # tema y colores de los gráficos
 set.seed(2026)
 ruta <- "data/agricultura.csv"
 
@@ -124,33 +125,37 @@ datos <- datos |>
 
 ## 13. Datos faltantes: identificación y cuantificación
 
-El archivo **no tiene NA explícitos**. Sin embargo, existen **datos faltantes encubiertos**: filas con
-producción positiva pero superficie cosechada igual a 0, lo cual es físicamente imposible (no se produce sin cosechar).
-En esas filas el rendimiento reportado (0) también es inválido porque se calcula con esa superficie.
+El archivo **no tiene NA explícitos**, pero sí **datos faltantes encubiertos**: filas con producción positiva
+y superficies registradas como 0. No se puede producir sin sembrar ni cosechar, así que esos ceros en realidad significan
+"dato no registrado". Afecta **a las dos superficies a la vez** (sembrada y cosechada) y también al rendimiento,
+que se calcula con ellas.
 
 ```{r}
 #| label: faltantes
 datos <- datos |>
   mutate(
-    cos_faltante = sup_cosechada_ha == 0 & produccion_tn > 0,
-    sup_cosechada_ha  = if_else(cos_faltante, NA_real_, sup_cosechada_ha),
-    rendimiento_kg_ha = if_else(cos_faltante, NA_real_, rendimiento_kg_ha)
+    sup_faltante = produccion_tn > 0 & sup_cosechada_ha == 0,
+    sup_sembrada_ha   = if_else(sup_faltante & sup_sembrada_ha == 0, NA_real_, sup_sembrada_ha),
+    sup_cosechada_ha  = if_else(sup_faltante, NA_real_, sup_cosechada_ha),
+    rendimiento_kg_ha = if_else(sup_faltante, NA_real_, rendimiento_kg_ha)
   )
 
-miss_var_summary(datos |> select(sup_sembrada_ha, sup_cosechada_ha, produccion_tn,
-                                 rendimiento_kg_ha, temperatura_c)) |>
-  kable(digits = 2)
+vars_faltantes <- c("sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_kg_ha", "temperatura_c")
+
+miss_var_summary(datos |> select(all_of(vars_faltantes))) |> kable(digits = 2)
 ```
 
 ```{r}
 #| label: grafico-faltantes
-gg_miss_var(datos |> select(sup_sembrada_ha, sup_cosechada_ha, produccion_tn,
-                            rendimiento_kg_ha, temperatura_c), show_pct = TRUE) +
+gg_miss_var(datos |> select(all_of(vars_faltantes)), show_pct = TRUE) +
   labs(title = "Porcentaje de datos faltantes por variable")
 ```
 
-**Cambio realizado:** se convirtieron a `NA` la superficie cosechada y el rendimiento en esas filas.
-El rendimiento se recalculará después de imputar la superficie.
+::: {.callout-note}
+## Cambio realizado
+Se convirtieron a `NA` la superficie sembrada, la superficie cosechada y el rendimiento en esas filas.
+Se imputarán las dos superficies y el rendimiento se recalculará con ellas.
+:::
 
 ## 14. Patrones de ausencia (MCAR / MAR)
 
@@ -158,66 +163,87 @@ Se trabaja con las filas donde hay producción (el resto no puede tener este pro
 
 ```{r}
 #| label: base-imputacion
+frutales <- c("Naranja", "Mandarina", "Limon", "Pomelo", "Banana")
+top15 <- names(sort(table(datos$cultivo[datos$produccion_tn > 0]), decreasing = TRUE))[1:15]
+
 base_imp <- datos |>
   filter(produccion_tn > 0) |>
-  mutate(cultivo_g = fct_lump_n(factor(cultivo), 15))   # agrupa cultivos poco frecuentes en "Other"
+  mutate(
+    # se agrupan los cultivos poco frecuentes, pero los frutales se conservan siempre
+    cultivo_g = fct_other(factor(cultivo), keep = union(top15, frutales)),
+    provincia_f = factor(provincia)
+  )
 
 # Prueba de Little (H0: los datos faltan completamente al azar, MCAR)
 mcar_test(base_imp |> select(sup_sembrada_ha, sup_cosechada_ha, produccion_tn, temperatura_c))
 ```
 
+¿Dónde están los faltantes? La tabla siguiente compara el grupo con el problema contra el resto:
+
+```{r}
+#| label: patron-faltantes
+base_imp |>
+  mutate(grupo = if_else(cultivo %in% frutales & anio_inicio <= 1975,
+                         "Frutales, campañas 1969/70 a 1975/76", "Resto de cultivos y campañas")) |>
+  group_by(grupo) |>
+  summarise(registros = n(), faltantes = sum(sup_faltante), pct_faltante = 100 * mean(sup_faltante)) |>
+  kable(digits = 1, format.args = list(big.mark = ","))
+
+base_imp |> filter(sup_faltante) |> count(cultivo, sort = TRUE) |> kable()
+```
+
 ```{r}
 #| label: mar-graficos
+#| fig-height: 4
 base_imp |>
-  group_by(cultivo_g) |>
-  summarise(pct_faltante = 100 * mean(cos_faltante)) |>
-  ggplot(aes(reorder(cultivo_g, pct_faltante), pct_faltante)) +
-  geom_col() + coord_flip() +
-  labs(title = "% de superficie cosechada faltante por cultivo", x = NULL, y = "% faltante")
+  group_by(cultivo) |>
+  summarise(pct_faltante = 100 * mean(sup_faltante)) |>
+  filter(pct_faltante > 0) |>
+  ggplot(aes(reorder(cultivo, pct_faltante), pct_faltante)) +
+  geom_col(fill = "#2E6F40") +
+  coord_flip() +
+  labs(title = "Cultivos con superficies faltantes",
+       x = NULL, y = "% de sus registros con superficie faltante")
 
 base_imp |>
   group_by(anio_inicio) |>
-  summarise(pct_faltante = 100 * mean(cos_faltante)) |>
+  summarise(pct_faltante = 100 * mean(sup_faltante)) |>
   ggplot(aes(anio_inicio, pct_faltante)) +
-  geom_line() +
-  labs(title = "% de superficie cosechada faltante por campaña", x = "Año de inicio", y = "% faltante")
+  geom_area(fill = "#3A7CA5", alpha = 0.4) +
+  geom_line(color = "#3A7CA5", linewidth = 0.9) +
+  labs(title = "% de registros con superficie faltante, por campaña",
+       x = "Año de inicio de campaña", y = "% faltante")
 ```
 
-```{r}
-#| label: mar-modelo
-# Si la ausencia depende de variables observadas (cultivo, año, superficie...), es MAR
-mod_mar <- glm(cos_faltante ~ cultivo_g + anio_inicio + log1p(sup_sembrada_ha) +
-                 log1p(produccion_tn) + temperatura_c,
-               data = base_imp, family = binomial)
-
-summary(mod_mar)$coefficients |>
-  as.data.frame() |>
-  rownames_to_column("termino") |>
-  arrange(`Pr(>|z|)`) |>
-  head(8) |>
-  kable(digits = 4)
-```
+::: {.callout-important}
+## Por qué no se usa una regresión logística
+Una regresión logística para explicar la ausencia **no converge** aquí: el cultivo y el año predicen la ausencia a la perfección
+(todos los frutales de 1969/70 a 1975/76 faltan y ningún otro registro falta). Sus p-valores no tendrían sentido, así que
+la evidencia se presenta con la tabla de conteos anterior.
+:::
 
 **Cómo interpretarlo (completa con tus resultados):**
 
-- Si el p-valor de Little es < 0.05 → se rechaza MCAR.
-- Si la regresión logística muestra variables significativas (cultivo, año, superficie) → la ausencia depende de datos observados, es decir, **MAR**.
+- Si el p-valor de Little es < 0.05, se rechaza MCAR.
+- La tabla de conteos muestra que la ausencia queda totalmente determinada por variables observadas (cultivo y año): es **MAR**.
 - Esto justifica usar métodos que aprovechen otras variables (regresión, KNN, MICE) en lugar de una media simple.
 
 ## 15–18. Métodos de imputación
 
-Se imputa únicamente `sup_cosechada_ha`; luego se recalcula el rendimiento. Cada método se define como una función
-que recibe la tabla y devuelve la superficie cosechada completa.
+Se imputa **la superficie cosechada** con la producción, el cultivo, la provincia y el año como variables de apoyo
+(la superficie sembrada no sirve de apoyo porque también falta, y la temperatura no se usa porque no se relaciona con nada).
+Después se calcula la superficie sembrada a partir de la cosechada con la proporción típica de cada cultivo,
+y se recalcula el rendimiento. Cada método es una función que recibe la tabla y devuelve la superficie cosechada completa.
 
 ### 15. Media y mediana
 
-Reemplaza los faltantes por un valor central. Es simple, pero ignora diferencias entre cultivos y reduce la variabilidad.
-Aquí se prueba la media global, la mediana global y la **mediana por cultivo**.
+Reemplaza los faltantes por un valor central. Es simple, pero ignora las diferencias entre cultivos y reduce la variabilidad.
+Se prueban la media global, la mediana global y la **mediana por cultivo**.
 
 ```{r}
 #| label: imp-central
-imp_media   <- function(d) replace_na(d$sup_cosechada_ha, mean(d$sup_cosechada_ha, na.rm = TRUE))
-imp_mediana <- function(d) replace_na(d$sup_cosechada_ha, median(d$sup_cosechada_ha, na.rm = TRUE))
+imp_media   <- function(d) coalesce(d$sup_cosechada_ha, mean(d$sup_cosechada_ha, na.rm = TRUE))
+imp_mediana <- function(d) coalesce(d$sup_cosechada_ha, median(d$sup_cosechada_ha, na.rm = TRUE))
 
 imp_mediana_cultivo <- function(d) {
   med <- d |> group_by(cultivo_g) |>
@@ -228,34 +254,30 @@ imp_mediana_cultivo <- function(d) {
 
 ### 16. Regresión
 
-Predice la superficie cosechada con un modelo lineal usando superficie sembrada, producción, temperatura, año y cultivo.
+Predice el logaritmo de la superficie cosechada con un modelo lineal (producción, cultivo, provincia y año).
 Se trabaja en escala logarítmica porque las variables son muy asimétricas.
 
 ```{r}
 #| label: imp-regresion
 imp_regresion <- function(d) {
-  mod <- lm(log1p(sup_cosechada_ha) ~ log1p(sup_sembrada_ha) + log1p(produccion_tn) +
-              temperatura_c + anio_inicio + cultivo_g, data = d)
-  pred <- pmax(expm1(predict(mod, newdata = d)), 0)
+  mod <- lm(log1p(sup_cosechada_ha) ~ log1p(produccion_tn) + cultivo_g + provincia_f + anio_inicio, data = d)
+  pred <- pmax(expm1(suppressWarnings(predict(mod, newdata = d))), 1)   # mínimo 1 ha
   coalesce(d$sup_cosechada_ha, pred)
 }
 ```
 
 ### 17. KNN
 
-Busca los 5 registros más parecidos (en superficie sembrada, producción, temperatura y año) y toma su mediana.
+Busca los 5 registros más parecidos (en producción, año, cultivo y provincia) y toma su mediana.
 
 ```{r}
 #| label: imp-knn
 imp_knn <- function(d) {
   x <- data.frame(
-    cos  = log1p(d$sup_cosechada_ha),
-    sem  = log1p(d$sup_sembrada_ha),
-    prod = log1p(d$produccion_tn),
-    temp = d$temperatura_c,
-    anio = d$anio_inicio
+    cos = log1p(d$sup_cosechada_ha), prod = log1p(d$produccion_tn),
+    anio = d$anio_inicio, cultivo_g = d$cultivo_g, provincia_f = d$provincia_f
   )
-  r <- VIM::kNN(x, variable = "cos", dist_var = c("sem", "prod", "temp", "anio"),
+  r <- VIM::kNN(x, variable = "cos", dist_var = c("prod", "anio", "cultivo_g", "provincia_f"),
                 k = 5, imp_var = FALSE)
   expm1(r$cos)
 }
@@ -268,120 +290,142 @@ incertidumbre de la imputación. Se usa *predictive mean matching* (`pmm`), que 
 
 ```{r}
 #| label: imp-mice
-imp_mice <- function(d, m = 1) {
+imp_mice_mids <- function(d, m = 1) {
   x <- d |> transmute(
-    cos  = log1p(sup_cosechada_ha),
-    sem  = log1p(sup_sembrada_ha),
-    prod = log1p(produccion_tn),
-    temp = temperatura_c,
-    anio = anio_inicio,
-    cultivo_g
+    cos = log1p(sup_cosechada_ha), prod = log1p(produccion_tn),
+    anio = anio_inicio, cultivo_g, provincia_f
   )
-  mice(x, m = m, method = "pmm", maxit = 5, printFlag = FALSE, seed = 2026)
+  suppressWarnings(mice(x, m = m, method = "pmm", maxit = 5, printFlag = FALSE, seed = 2026))
 }
+
+imp_mice <- function(d) expm1(mice::complete(imp_mice_mids(d, 1), 1)$cos)
 ```
 
 ## 19. Comparación y justificación de los métodos
 
-Para saber qué método funciona mejor se hace un **experimento de validación**: se toman filas donde la superficie
-cosechada sí es conocida, se **ocultan artificialmente** el 10% de los valores, se imputan con cada método y se compara
-contra el valor real.
+Para saber qué método funciona mejor se hace un **experimento de validación que imita el problema real**:
+los faltantes verdaderos son frutales de las **primeras 7 campañas**, y los años anteriores no tienen ningún dato del cultivo.
+Entonces se ocultan los frutales de **1976/77 a 1982/83** (las 7 primeras campañas con datos), se imputan con cada método y
+se comparan con el valor real. Así se mide qué tan bien se reconstruye el pasado de un cultivo.
 
 ```{r}
 #| label: validacion
 #| cache: true
-completos <- base_imp |> filter(!is.na(sup_cosechada_ha), sup_cosechada_ha > 0)
+fr_ok   <- base_imp |> filter(!sup_faltante, cultivo %in% frutales)
+ventana <- fr_ok |> filter(anio_inicio %in% 1976:1982)
 
-muestra <- completos |> slice_sample(n = 10000)       # muestra para que KNN y MICE sean rápidos
-mask    <- sample(nrow(muestra), size = round(0.10 * nrow(muestra)))
-verdad  <- muestra$sup_cosechada_ha[mask]
+# Muestra: todos los frutales con datos + 10,000 registros de otros cultivos
+muestra <- bind_rows(
+  fr_ok,
+  base_imp |> filter(!sup_faltante, !cultivo %in% frutales) |> slice_sample(n = 10000)
+)
+
+mask   <- which(muestra$id_fila %in% ventana$id_fila)
+verdad <- muestra$sup_cosechada_ha[mask]
 
 prueba <- muestra
 prueba$sup_cosechada_ha[mask] <- NA
 
-evaluar <- function(f, nombre, ...) {
-  est <- f(prueba, ...)[mask]
+evaluar <- function(f, nombre) {
+  est <- f(prueba)[mask]
   tibble(metodo = nombre,
          RMSE = sqrt(mean((est - verdad)^2)),
          MAE = mean(abs(est - verdad)),
-         RMSE_log = sqrt(mean((log1p(est) - log1p(verdad))^2)))
+         RMSE_log = sqrt(mean((log1p(est) - log1p(verdad))^2)),
+         error_pct_mediano = 100 * median(abs(est - verdad) / verdad))
 }
 
-resultados <- bind_rows(
-  evaluar(imp_media,           "Media global"),
-  evaluar(imp_mediana,         "Mediana global"),
-  evaluar(imp_mediana_cultivo, "Mediana por cultivo"),
-  evaluar(imp_regresion,       "Regresión"),
-  evaluar(imp_knn,             "KNN (k = 5)"),
-  evaluar(\(d) expm1(complete(imp_mice(d), 1)$cos), "MICE (pmm)")
-) |> arrange(RMSE_log)
+metodos <- list(
+  "Media global"        = imp_media,
+  "Mediana global"      = imp_mediana,
+  "Mediana por cultivo" = imp_mediana_cultivo,
+  "Regresion"           = imp_regresion,
+  "KNN (k = 5)"         = imp_knn,
+  "MICE (pmm)"          = imp_mice
+)
 
+resultados <- bind_rows(Map(evaluar, metodos, names(metodos))) |> arrange(RMSE_log)
+
+c(registros_ocultados = length(mask), muestra = nrow(muestra))
 kable(resultados, digits = 2, format.args = list(big.mark = ","))
 ```
 
-**Cómo leer la tabla:** `RMSE` y `MAE` están en hectáreas y los dominan los departamentos grandes;
-`RMSE_log` mide el error relativo y es más justo con departamentos pequeños. Menor es mejor.
+**Cómo leer la tabla:** `RMSE` y `MAE` están en hectáreas y los dominan los departamentos grandes. `RMSE_log` mide el error relativo
+(es más justo con departamentos pequeños) y `error_pct_mediano` es el error porcentual típico de una imputación. Menor es mejor.
 
 ```{r}
 #| label: grafico-validacion
 resultados |>
-  pivot_longer(c(RMSE, MAE, RMSE_log), names_to = "metrica", values_to = "valor") |>
-  ggplot(aes(reorder(metodo, valor), valor)) +
-  geom_col() + coord_flip() +
+  pivot_longer(c(RMSE_log, error_pct_mediano), names_to = "metrica", values_to = "valor") |>
+  mutate(metrica = recode(metrica, RMSE_log = "RMSE en escala log",
+                          error_pct_mediano = "Error porcentual mediano (%)")) |>
+  ggplot(aes(reorder(metodo, -valor), valor)) +
+  geom_col(fill = "#3A7CA5") +
+  coord_flip() +
   facet_wrap(~metrica, scales = "free_x") +
   labs(title = "Error de imputación por método", x = NULL, y = NULL)
 ```
 
-**Justificación (completa con tu tabla):** elige el método con menor error, considerando además que MICE conserva
-la variabilidad natural de los datos y reconoce la incertidumbre, mientras que la media/mediana la subestiman.
+**Justificación (completa con tu tabla):** se elige el método con menor `RMSE_log`, porque las superficies abarcan varios órdenes
+de magnitud y lo importante es el error relativo. Los métodos que usan otras variables (regresión, KNN, MICE) reducen mucho el error frente a la media
+y la mediana, que ignoran el cultivo y el año. Las imputaciones tienen un error típico de decenas de porcentaje, por lo que se
+marcan con `sup_imputada` y no se usan para entrenar modelos (Fase 6).
 
 ## Imputación final
 
-Se aplica el método elegido a todo el dataset. Cambia `metodo_final` según tu tabla comparativa.
+El método final se elige **automáticamente** como el de menor `RMSE_log` entre los aplicables a toda la base
+(KNN se excluye de la imputación final porque es demasiado lento con ~118,000 filas, aunque sí se evalúa arriba).
+Si prefieres otro, escribe su nombre en `metodo_manual`.
 
 ```{r}
 #| label: imputacion-final
 #| cache: true
-metodo_final <- "mice"   # opciones: "mediana_cultivo", "regresion", "knn", "mice"
-# Aviso: "knn" puede tardar mucho con toda la base; "mice" también demora varios minutos.
+metodo_manual <- NULL   # ejemplo: "MICE (pmm)"
 
-cos_final <- switch(
-  metodo_final,
-  mediana_cultivo = imp_mediana_cultivo(base_imp),
-  regresion       = imp_regresion(base_imp),
-  knn             = imp_knn(base_imp),
-  mice = {
-    imp5 <- imp_mice(base_imp, m = 5)
-    # promedio de las 5 imputaciones (en hectáreas)
-    rowMeans(sapply(1:5, \(i) expm1(complete(imp5, i)$cos)))
-  }
-)
+metodo_final <- if (!is.null(metodo_manual)) metodo_manual else
+  resultados |> filter(metodo != "KNN (k = 5)") |> slice_min(RMSE_log, n = 1) |> pull(metodo)
 
-imputados <- tibble(id_fila = base_imp$id_fila, cos_final = coalesce(base_imp$sup_cosechada_ha, cos_final))
+cat("Método de imputación final:", metodo_final, "\n")
+
+cos_final <- metodos[[metodo_final]](base_imp)
+
+# Proporción típica cosechada/sembrada de cada cultivo (para reconstruir la superficie sembrada)
+ratio_cultivo <- datos |>
+  filter(!is.na(sup_sembrada_ha), !is.na(sup_cosechada_ha), sup_sembrada_ha > 0, sup_cosechada_ha > 0) |>
+  group_by(cultivo) |>
+  summarise(ratio = min(median(sup_cosechada_ha / sup_sembrada_ha), 1), .groups = "drop")
+
+imputados <- tibble(id_fila = base_imp$id_fila, cos_imp = pmax(cos_final, 1))   # una superficie imputada nunca baja de 1 ha
 
 datos_limpio <- datos |>
   left_join(imputados, by = "id_fila") |>
+  left_join(ratio_cultivo, by = "cultivo") |>
   mutate(
-    sup_cosechada_imputada = cos_faltante,
-    sup_cosechada_ha = coalesce(sup_cosechada_ha, cos_final),
-    rendimiento_kg_ha = if_else(
-      cos_faltante & sup_cosechada_ha > 0,
-      produccion_tn / sup_cosechada_ha * 1000,
-      rendimiento_kg_ha
-    )
+    ratio = coalesce(ratio, 1),
+    sup_imputada      = sup_faltante,
+    sup_cosechada_ha  = if_else(sup_faltante, cos_imp, sup_cosechada_ha),
+    # la sembrada nunca puede ser menor que la cosechada
+    sup_sembrada_ha   = if_else(sup_faltante, pmax(cos_imp / ratio, cos_imp), sup_sembrada_ha),
+    rendimiento_kg_ha = if_else(sup_faltante, produccion_tn / sup_cosechada_ha * 1000, rendimiento_kg_ha)
   ) |>
-  select(-cos_final, -cos_faltante)
+  select(-cos_imp, -ratio, -sup_faltante)
 ```
+
+::: {.callout-note}
+## Cambios realizados
+En las 3,201 filas afectadas se imputó la superficie cosechada con el método elegido, se reconstruyó la superficie sembrada
+(cosechada ÷ proporción típica del cultivo, sin que sea menor que la cosechada) y se recalculó el rendimiento.
+Esas filas quedan marcadas con `sup_imputada = TRUE`.
+:::
 
 ### Diagnóstico de MICE
 
-Se revisa que las imputaciones sean razonables y que el algoritmo haya convergido.
+Se revisa que, si se usara imputación múltiple, los valores imputados fueran razonables y el algoritmo hubiera convergido.
 
 ```{r}
 #| label: diagnostico-mice
 #| cache: true
-# Si el método final no fue MICE, se crea aquí para poder hacer el diagnóstico
-if (!exists("imp5")) imp5 <- imp_mice(base_imp, m = 5)
+imp5 <- imp_mice_mids(base_imp, m = 5)
 
 # Densidad de valores observados (azul) vs. imputados (rojo), en escala log
 mice::densityplot(imp5, ~ cos)
@@ -397,46 +441,57 @@ En el gráfico de convergencia, las líneas deben entrecruzarse sin subir ni baj
 
 ```{r}
 #| label: validacion-final
-antes_despues <- bind_rows(
-  datos        |> summarise(version = "Antes (con NA)",
-                            n = n(), NA_cosechada = sum(is.na(sup_cosechada_ha)),
-                            media = mean(sup_cosechada_ha, na.rm = TRUE),
-                            mediana = median(sup_cosechada_ha, na.rm = TRUE),
-                            sd = sd(sup_cosechada_ha, na.rm = TRUE)),
-  datos_limpio |> summarise(version = "Después (imputado)",
-                            n = n(), NA_cosechada = sum(is.na(sup_cosechada_ha)),
-                            media = mean(sup_cosechada_ha, na.rm = TRUE),
-                            mediana = median(sup_cosechada_ha, na.rm = TRUE),
-                            sd = sd(sup_cosechada_ha, na.rm = TRUE))
-)
-kable(antes_despues, digits = 1, format.args = list(big.mark = ","))
+resumen <- function(df, etiqueta) {
+  df |> summarise(
+    version = etiqueta, n = n(),
+    NA_sembrada = sum(is.na(sup_sembrada_ha)), NA_cosechada = sum(is.na(sup_cosechada_ha)),
+    media_cosechada = mean(sup_cosechada_ha, na.rm = TRUE),
+    mediana_cosechada = median(sup_cosechada_ha, na.rm = TRUE),
+    sd_cosechada = sd(sup_cosechada_ha, na.rm = TRUE)
+  )
+}
+
+bind_rows(resumen(datos, "Antes (con NA)"), resumen(datos_limpio, "Después (imputado)")) |>
+  kable(digits = 1, format.args = list(big.mark = ","))
 
 # Revisiones de consistencia sobre el dataset final
 tibble(
   control = c("NA totales en el dataset final",
               "Filas con cosechada > sembrada",
+              "Filas imputadas con cosechada > sembrada",
               "Filas con rendimiento NA o infinito",
               "Filas imputadas"),
   valor = c(sum(is.na(datos_limpio)),
             sum(datos_limpio$sup_cosechada_ha > datos_limpio$sup_sembrada_ha, na.rm = TRUE),
+            sum(datos_limpio$sup_cosechada_ha > datos_limpio$sup_sembrada_ha & datos_limpio$sup_imputada),
             sum(!is.finite(datos_limpio$rendimiento_kg_ha)),
-            sum(datos_limpio$sup_cosechada_imputada))
+            sum(datos_limpio$sup_imputada))
 ) |> kable()
 ```
 
+Las filas con cosechada > sembrada que quedan son las pocas que ya venían así en el archivo original; **las imputadas deben dar 0**.
+
+El mejor control es ver si la serie de los frutales se ve continua entre la parte imputada (1969/70 a 1975/76) y la observada:
+
 ```{r}
-#| label: grafico-antes-despues
-bind_rows(
-  datos        |> filter(produccion_tn > 0, !is.na(sup_cosechada_ha)) |> transmute(version = "Antes", x = sup_cosechada_ha),
-  datos_limpio |> filter(produccion_tn > 0)                          |> transmute(version = "Después", x = sup_cosechada_ha)
-) |>
-  ggplot(aes(log1p(x), fill = version)) +
-  geom_density(alpha = 0.4) +
-  labs(title = "Superficie cosechada antes y después de imputar",
-       x = "log(1 + hectáreas)", y = "Densidad", fill = NULL)
+#| label: grafico-continuidad
+#| fig-height: 6
+datos_limpio |>
+  filter(cultivo %in% frutales) |>
+  group_by(cultivo, anio_inicio) |>
+  summarise(sup_ha = sum(sup_cosechada_ha), .groups = "drop") |>
+  mutate(origen = if_else(anio_inicio <= 1975, "Imputado", "Observado")) |>
+  ggplot(aes(anio_inicio, sup_ha)) +
+  geom_line(color = "grey60") +
+  geom_point(aes(color = origen), size = 1.8) +
+  facet_wrap(~cultivo, scales = "free_y") +
+  scale_y_continuous(labels = scales::comma) +
+  scale_color_manual(values = c(Imputado = "#B2182B", Observado = "#2166AC")) +
+  labs(title = "Superficie cosechada de frutales: parte imputada vs. observada",
+       x = "Año de inicio de campaña", y = "Superficie cosechada total (ha)", color = NULL)
 ```
 
-Si las dos curvas casi se superponen, la imputación **no distorsionó** la distribución original.
+Si los puntos rojos continúan la tendencia de los azules sin saltos bruscos, la imputación es coherente.
 
 ## Exportación del dataset limpio
 
@@ -455,5 +510,6 @@ dim(datos_limpio)
 | Punto como separador de miles | `parse_number()` con `grouping_mark = "."` | El rendimiento recalculado coincide con el reportado |
 | Espacios dobles y acentos | `str_squish()` y normalización | Evita categorías duplicadas |
 | Filas sin actividad | Excluidas | No aportan información |
-| Producción > 0 con cosechada = 0 | Convertida a NA e imputada | Es físicamente imposible; se trata como dato faltante |
+| Producción > 0 con superficies = 0 (3,201 filas, solo frutales 1969/70 a 1975/76) | Convertidas a NA e imputadas (cosechada por el método de menor error; sembrada derivada) | Es físicamente imposible; la ausencia es MAR (depende de cultivo y año) |
 | ID de departamento repetido | `clave_departamento` | Identificador único |
+| Filas imputadas | Marcadas con `sup_imputada` | Permiten excluirlas del entrenamiento de modelos |

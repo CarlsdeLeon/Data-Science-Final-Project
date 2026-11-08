@@ -206,9 +206,21 @@ es una simplificación fuerte (sobre todo con variables one-hot), pero sirve de 
 
 ```{python}
 #| label: naive-bayes
-modelos_clf["Naive Bayes"] = pipe_clf(GaussianNB()).fit(Xc_tr, yc_tr)
-resultados_clf.append(evaluar_clf("Naive Bayes", modelos_clf["Naive Bayes"]))
-resultados_clf[-1]
+from sklearn.naive_bayes import BernoulliNB
+
+# BernoulliNB maneja correctamente las matrices dispersas y variables binarias (One-Hot)
+modelos_clf["Naive Bayes"] = pipe_clf(BernoulliNB()).fit(Xc_tr, yc_tr)
+
+# Actualizar el diccionario o lista de resultados de clasificación
+# Buscamos si ya existe para reemplazarlo o agregarlo limpiamente
+eval_nb = evaluar_clf("Naive Bayes", modelos_clf["Naive Bayes"])
+# Reemplazar o actualizar en resultados_clf
+resultados_clf = [r if r["modelo"] != "Naive Bayes" else eval_nb for r in resultados_clf]
+if not any(r["modelo"] == "Naive Bayes" for r in resultados_clf):
+    resultados_clf.append(eval_nb)
+
+print("Naive Bayes (Bernoulli) evaluado correctamente:")
+print(eval_nb)
 ```
 
 ## 61. Árbol de decisión
@@ -373,12 +385,18 @@ Un valor desconocido no genera error: se codifica como categoría infrecuente.
 
 ## Conclusiones y limitaciones
 
-*(Completa con tus resultados.)*
 
-- **Regresión:** ¿qué modelo ganó y cuánto mejora respecto al baseline por cultivo? ¿Qué variables fueron más importantes?
-- **Clasificación:** ¿algún modelo supera claramente al baseline? Si el AUC es cercano a 0.5, la calidad no se explica con estas variables.
+
+- **Regresión:** Random Forest (RMSE 1,318, MAE 602, R² 0.956) y XGBoost (1,322; 679; 0.956) superan por mucho a la regresión lineal (3,034; R² 0.767) y al baseline por cultivo (3,413; R² 0.705): 
+                 el error baja cerca de 61%. El R² es inusualmente alto y puede ser optimista por la partición aleatoria.
+- **Clasificación:** Todos los modelos obtienen AUC entre 0.499 y 0.503 y accuracy de 0.40, igual al baseline (0.401). La calidad no se puede predecir con estas variables. 
+                 El “mejor” modelo (One-vs-Rest, AUC 0.503) no se distingue del azar.
 - **Limitaciones:**
     - la partición aleatoria puede ser optimista porque el mismo departamento aparece en entrenamiento y prueba;
     - se excluyeron las filas imputadas y los ceros, por lo que el modelo solo aplica a cultivos con producción;
     - el objetivo de regresión es el rendimiento winsorizado, no el original;
     - Naive Bayes Gaussiano asume independencia y normalidad, supuestos que aquí no se cumplen.
+
+- **Desempeño en clasificación:** El hecho de que los clasificadores obtengan un AUC cercano a 0.50 demuestra empíricamente que la variable ordinal 
+                 calidad no guarda una relación lineal o determinista directa con las características agronómicas cuantitativas evaluadas, un hallazgo diagnóstico crucial 
+                 que evita falsas expectativas predictivas sobre datos cualitativos subjetivos.

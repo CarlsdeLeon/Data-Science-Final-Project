@@ -26,32 +26,31 @@ book:
         - python/04b_eda_python.qmd
     - part: "Fase 5 · Visualización"
       chapters:
-        - r/05_visualizacion_R.
         - r/05_visualizacion_R.qmd
         - python/05b_interactiva_python.qmd
     - part: "Fase 6 · Preparación para ML"
       chapters:
-        - python/06b_preparacion_ml_python.qmd
+        - python/06_preparacion_ml_python.qmd
     - part: "Fase 7 · Modelado"
       chapters:
-        - python/07b_modelado_python.qmd
-        
-    # Las siguientes fases se agregarán aquí:
-    # - 03_atipicos_R.qmd
-    # - 04_eda_R.qmd / 04b_eda_python.qmd
-    # - 05_visualizacion_R.qmd
-    # - 06_preparacion_ml_python.qmd
-    # - 07_modelado_python.qmd
+        - python/07_modelado_python.qmd
 
 format:
   html:
-    theme: cosmo
+    theme: [cosmo, styles.css]
     toc: true
+    toc-depth: 3
     code-fold: true
     code-tools: true
+    smooth-scroll: true
+    fig-align: center
+    fig-width: 9
+    fig-height: 5.5
+    fig-dpi: 150
 
 lang: es
 
 execute:
   warning: false
   message: false
+  freeze: auto

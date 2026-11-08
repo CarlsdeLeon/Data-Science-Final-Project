@@ -188,5 +188,8 @@ print("Kruskal-Wallis entre provincias (maíz):", stats.kruskal(*grupos))
 
 ## Conclusiones de la fase
 
-Los resultados deben coincidir con los de R (mismas correlaciones, mismos p-valores y mismas tendencias).
-Completa con tu interpretación estadística de cada prueba y confirma que ambos lenguajes llegan a las mismas conclusiones.
+Evolución: las tendencias más confiables (R² más alto) son arroz (+87 kg/ha/año, R² 0.62), té (+138, 0.56), maíz (+107, 0.47) y papa (+374, 0.30). Pomelo (+395) o caña (+156) tienen pendiente alta pero R² ≤ 0.13, así que su tendencia es poco fiable.
+Concentración: Buenos Aires, Córdoba y Santa Fe suman el 74.7% de la superficie cosechada acumulada (37.0%, 20.8% y 16.9%).
+Superficie vs. producción: correlación de 0.935 en escala log; sembrada y cosechada, 0.97. El PCA muestra que el primer componente (57.5%) es el “tamaño” y el segundo (21.8%) el rendimiento.
+Variabilidad: mayor coeficiente de variación en maíz (64.0%), cebolla (61.4%), yerba mate (53.4%) y maní (53.3%). El maíz varía porque se cultiva en regiones muy distintas: mediana de 4,322 kg/ha en Buenos Aires contra 1,200 en Corrientes (Kruskal-Wallis p < 2.2e-16).
+Calidad: con p = 0.044 el rendimiento “difiere” por calidad, pero las medianas son idénticas (2,000) y la asociación cultivo-calidad es nula (V de Cramér = 0.011). Python reproduce R; el único cambio (4,837 vs 4,811 en Kruskal) viene de que Python excluye provincias con menos de 30 registros

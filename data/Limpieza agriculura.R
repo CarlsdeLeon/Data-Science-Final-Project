@@ -3,11 +3,11 @@
 # =============================================================================
 # Qué hace este script:
 #   1. Lee el CSV completo como texto (para no perder información al importar)
-#   2. Arregla los nombres de columnas (el archivo trae caracteres dañados: Campa?a, Producci?n)
+#   2. Arregla los nombres de columnas (el archivo trae caracteres dañados: ?a, Producci?n)
 #   3. Convierte los números: en este archivo el PUNTO es separador de miles
 #      (ej. "3.333" = 3333, "1.050.000" = 1050000), no decimal
 #   4. Limpia texto (espacios dobles en nombres de departamentos)
-#   5. Separa la campaña "1969/70" en año de inicio y año de fin
+#   5. Separa la ña "1969/70" en año de inicio y año de fin
 #   6. Agrega banderas (flags) de calidad SIN borrar ni modificar datos originales
 #   7. Exporta a Excel (datos + diccionario + control de calidad) y a CSV limpio
 #
@@ -50,7 +50,7 @@ names(crudo) <- c(
   "id_provincia", "provincia",
   "id_departamento", "departamento",
   "id_cultivo", "cultivo",
-  "id_campana", "campana",
+  "id_na", "na",
   "temperatura_c",
   "sup_sembrada_ha", "sup_cosechada_ha",
   "produccion_tn", "rendimiento_kg_ha",
@@ -60,7 +60,7 @@ names(crudo) <- c(
 # ---- 3. Limpieza de texto ---------------------------------------------------
 # str_squish: quita espacios al inicio/fin y reduce espacios dobles a uno
 # (ej. "25 DE  MAYO" -> "25 DE MAYO")
-texto <- c("provincia", "departamento", "cultivo", "campana", "calidad")
+texto <- c("provincia", "departamento", "cultivo", "na", "calidad")
 datos <- crudo |>
   mutate(across(all_of(texto), str_squish))
 
@@ -73,17 +73,17 @@ num_miles <- function(x) parse_number(x, locale = loc_ar)
 
 datos <- datos |>
   mutate(
-    across(c(id_provincia, id_departamento, id_cultivo, id_campana, temperatura_c),
+    across(c(id_provincia, id_departamento, id_cultivo, id_na, temperatura_c),
            \(x) as.integer(x)),
     across(c(sup_sembrada_ha, sup_cosechada_ha, produccion_tn, rendimiento_kg_ha),
            num_miles)
   )
 
-# ---- 5. Campaña -> años -----------------------------------------------------
+# ---- 5. ña -> años -----------------------------------------------------
 # "1969/70" -> anio_inicio = 1969, anio_fin = 1970 ; "1999/00" -> 1999 y 2000
 datos <- datos |>
   mutate(
-    anio_inicio = as.integer(str_sub(campana, 1, 4)),
+    anio_inicio = as.integer(str_sub(na, 1, 4)),
     anio_fin    = anio_inicio + 1L
   )
 
@@ -121,7 +121,7 @@ datos <- datos |>
 datos <- datos |>
   select(
     id_provincia, provincia, id_departamento, clave_departamento, departamento,
-    id_cultivo, cultivo, id_campana, campana, anio_inicio, anio_fin,
+    id_cultivo, cultivo, id_na, na, anio_inicio, anio_fin,
     temperatura_c, calidad,
     sup_sembrada_ha, sup_cosechada_ha, produccion_tn, rendimiento_kg_ha,
     starts_with("flag_")
@@ -130,16 +130,16 @@ datos <- datos |>
 
 # ---- 9. Control de calidad --------------------------------------------------
 n_duplicados <- sum(duplicated(datos[c("id_provincia", "id_departamento",
-                                       "id_cultivo", "id_campana")]))
+                                       "id_cultivo", "id_na")]))
 
 control <- tibble::tribble(
   ~control, ~resultado,
   "Filas en el archivo original",                         n_original,
   "Filas en el archivo limpio",                           nrow(datos),
-  "Filas duplicadas (misma provincia-depto-cultivo-campaña)", n_duplicados,
+  "Filas duplicadas (misma provincia-depto-cultivo-ña)", n_duplicados,
   "Valores vacíos (NA) en todo el archivo",               sum(is.na(datos)),
-  "Años de campaña desde",                                min(datos$anio_inicio),
-  "Años de campaña hasta",                                max(datos$anio_inicio),
+  "Años de ña desde",                                min(datos$anio_inicio),
+  "Años de ña hasta",                                max(datos$anio_inicio),
   "Provincias",                                           n_distinct(datos$provincia),
   "Departamentos (clave única provincia-depto)",          n_distinct(datos$clave_departamento),
   "Cultivos",                                             n_distinct(datos$cultivo),
@@ -163,10 +163,10 @@ diccionario <- tibble::tribble(
   "departamento",       "texto",   "Nombre del departamento",
   "id_cultivo",         "entero",  "Código numérico del cultivo",
   "cultivo",            "texto",   "Nombre del cultivo",
-  "id_campana",         "entero",  "Código numérico de la campaña (1 = 1969/70)",
-  "campana",            "texto",   "Campaña agrícola (ej. 1969/70)",
-  "anio_inicio",        "entero",  "Año en que inicia la campaña",
-  "anio_fin",           "entero",  "Año en que termina la campaña",
+  "id_na",         "entero",  "Código numérico de la ña (1 = 1969/70)",
+  "na",            "texto",   "ña agrícola (ej. 1969/70)",
+  "anio_inicio",        "entero",  "Año en que inicia la ña",
+  "anio_fin",           "entero",  "Año en que termina la ña",
   "temperatura_c",      "entero",  "Temperatura en grados Celsius (según el archivo original)",
   "calidad",            "factor",  "Calidad registrada: Baja < Promedio < Alta",
   "sup_sembrada_ha",    "numérico","Superficie sembrada (hectáreas)",

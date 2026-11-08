@@ -30,4 +30,6 @@ Thumbs.db
 
 # Salidas temporales
 outputs/temp/
-  
+
+/.quarto/
+**/*.quarto_ipynb

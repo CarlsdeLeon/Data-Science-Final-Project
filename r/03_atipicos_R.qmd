@@ -207,8 +207,12 @@ act |>
        y = "Rendimiento (kg/ha, escala log)", fill = NULL)
 ```
 
-**Interpretación (completa con tus resultados):** la mediana casi no cambia, mientras que la media y la desviación estándar
+**Interpretación:** La mediana casi no cambia, mientras que la media y la desviación estándar
 bajan donde había valores extremos. Esto confirma que el tratamiento reduce la influencia de los extremos sin alterar el centro de los datos.
+Se winsorizaron 3,794 registros (2.91%). La mediana no cambió (2,000 kg/ha); la media bajó de 4,116.8 a 4,088.7, la desviación de 6,239 a 6,080, 
+la asimetría de 5.8 a 4.9 y el máximo de 300,000 a 81,721. El efecto es mayor en cultivos con extremos, como la papa (desviación 5,982 -> 5,128) 
+y la cebolla (9,241 -> 8,143), y casi nulo en soja o girasol. La regla global marcaba 13,203 valores (11.5%) contra 2,300 con límites por cultivo, 
+porque penalizaba a los cultivos de alto rendimiento. Superficie y producción se conservaron: sus valores altos son departamentos grandes reales.
 
 ## Exportación
 

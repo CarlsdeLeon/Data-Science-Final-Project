@@ -33,7 +33,7 @@ Lectura directa, sin ajustes:
 #| label: lectura-cruda
 crudo = pd.read_csv(ruta)
 print(crudo.dtypes)
-crudo.iloc[:3, [9, 10, 11, 12]]
+crudo.iloc[:3, [9, 10, 11, 12]].astype(str)
 ```
 
 Igual que en R: `Producción (Tn)` queda como texto y los números con punto de miles se leen mal
@@ -53,7 +53,12 @@ miles = ["sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_kg
 
 datos[enteras] = datos[enteras].astype(int)
 for c in miles:
-    datos[c] = pd.to_numeric(datos[c].str.replace(".", "", regex=False))
+    datos[c] = pd.to_numeric(
+        datos[c].astype(str)
+                .str.replace(".", "", regex=False)
+                .str.replace(",", ".", regex=False),
+        errors="coerce"
+    )
 ```
 
 ## Creación y manipulación de DataFrames

@@ -250,9 +250,9 @@ kruskal.test(rendimiento_wins_kg_ha ~ provincia, data = maiz)
 
 ## Conclusiones de la fase
 
-*(Completa con tus resultados.)*
+1. **Evolución:** las tendencias más confiables (R² más alto) son arroz (+87 kg/ha/año, R² 0.62), té (+138, 0.56), maíz (+107, 0.47) y papa (+374, 0.30). Pomelo (+395) o caña (+156) tienen pendiente alta pero R² ≤ 0.13, así que su tendencia es poco fiable.
+2. **Concentración:** Buenos Aires, Córdoba y Santa Fe suman el 74.7% de la superficie cosechada acumulada (37.0%, 20.8% y 16.9%).
+3. **Superficie vs. producción:** correlación de 0.935 en escala log; sembrada y cosechada, 0.97. El PCA muestra que el primer componente (57.5%) es el “tamaño” y el segundo (21.8%) el rendimiento.
+4. **Variabilidad:** mayor coeficiente de variación en maíz (64.0%), cebolla (61.4%), yerba mate (53.4%) y maní (53.3%). El maíz varía porque se cultiva en regiones muy distintas: mediana de 4,322 kg/ha en Buenos Aires contra 1,200 en Corrientes (Kruskal-Wallis p < 2.2e-16).
+5. **Calidad:** con p = 0.044 el rendimiento “difiere” por calidad, pero las medianas son idénticas (2,000) y la asociación cultivo-calidad es nula (V de Cramér = 0.011). Python reproduce R; el único cambio (4,837 vs 4,811 en Kruskal) viene de que Python excluye provincias con menos de 30 registros
 
-1. **Evolución:** ¿qué cultivos crecen más en producción y rendimiento y cuáles se estancan?
-2. **Concentración:** ¿qué provincias y cultivos concentran la mayor superficie?
-3. **Superficie vs. producción:** ¿qué tan alta es la correlación? (Es esperable que sea muy alta.)
-4. **Variabilidad:** ¿qué cultivos tienen mayor coeficiente de variación y por qué podría ser?

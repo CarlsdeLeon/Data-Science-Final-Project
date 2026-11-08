@@ -254,5 +254,12 @@ dividiría por años (entrenar con campañas antiguas y probar con las recientes
 
 ## Conclusión de la fase
 
-*(Completa con tus resultados.)* Los datos quedan listos: ~80% para entrenamiento y ~20% para prueba, con recetas de
+**Los datos quedan listos:** ~80% para entrenamiento y ~20% para prueba, con recetas de
 preprocesamiento guardadas en `data/ml/`. Se definieron dos objetivos: **predecir el rendimiento** (regresión) y **clasificar la calidad** (multiclase).
+Quedan 114,709 registros para modelar (91,767 de entrenamiento y 22,942 de prueba) y 58 columnas tras la codificación. 
+La información mutua con el rendimiento es 0.83 para cultivo, 0.26 para superficie sembrada, 0.19 para provincia y año, y 0.00 para temperatura, que no aporta. 
+El logaritmo reduce la asimetría (por ejemplo, de 13.4 a −0.02 en producción).
+
+**Estructura de panel y partición:** Dado que el dataset recopila observaciones repetidas por departamento a lo largo de 48 campañas, 
+la partición aleatoria estándar (train_test_split) puede generar cierta dependencia espacial y temporal entre conjuntos, 
+lo que explica en parte el elevado $R^2$ en los modelos de ensamblaje (Random Forest y XGBoost).
