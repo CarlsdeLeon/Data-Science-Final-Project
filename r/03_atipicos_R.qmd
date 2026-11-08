@@ -8,13 +8,14 @@ library(tidyverse)
 library(knitr)
 library(scales)
 
-theme_set(theme_minimal(base_size = 12))
+source("r/tema.R")   # tema, colores y opción usar_imputadas
 
 datos <- readRDS("data/agricultura_limpia.rds")   # generado en la Fase 2
 
 # Los atípicos se analizan solo en filas con actividad real:
 # los ceros (pérdida total) son válidos, pero distorsionan los cuartiles.
-act <- datos |> filter(sup_sembrada_ha > 0, sup_cosechada_ha > 0, produccion_tn > 0)
+act <- datos |> filter(sup_sembrada_ha > 0, sup_cosechada_ha > 0, produccion_tn > 0,
+                       usar_imputadas | !sup_imputada)
 
 vars_num <- c("sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_kg_ha")
 c(total = nrow(datos), con_actividad = nrow(act))
@@ -163,7 +164,8 @@ c(filas_modificadas = sum(datos$rend_winsorizado),
 
 ```{r}
 #| label: comparacion
-act <- datos |> filter(sup_sembrada_ha > 0, sup_cosechada_ha > 0, produccion_tn > 0)
+act <- datos |> filter(sup_sembrada_ha > 0, sup_cosechada_ha > 0, produccion_tn > 0,
+                       usar_imputadas | !sup_imputada)
 
 act |>
   summarise(

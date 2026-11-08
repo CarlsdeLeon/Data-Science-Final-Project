@@ -162,6 +162,48 @@ ax[1].set_xlabel("Error (real − predicho, kg/ha)"); ax[1].set_title("Distribuc
 plt.tight_layout(); plt.show()
 ```
 
+## Validación temporal (robustez del resultado)
+
+El R² anterior es muy alto. Como el dataset es un panel (cada departamento aparece en muchas campañas), una partición aleatoria deja
+campañas vecinas del mismo departamento en entrenamiento y prueba, y eso puede hacer el resultado **optimista**.
+Para comprobarlo, se entrena con campañas antiguas (hasta 2009/10) y se prueba con las recientes (desde 2010/11), que es como se usaría
+el modelo en la práctica: predecir el futuro.
+
+```{python}
+#| label: validacion-temporal
+#| cache: true
+todo = pd.concat([reg_train, reg_test], ignore_index=True)
+tr_t, te_t = todo[todo["anio_inicio"] <= 2009], todo[todo["anio_inicio"] >= 2010]
+Xt_tr, yt_tr = tr_t.drop(columns=OBJ_REG), tr_t[OBJ_REG]
+Xt_te, yt_te = te_t.drop(columns=OBJ_REG), te_t[OBJ_REG]
+print(f"Entrenamiento (hasta 2009/10): {len(tr_t):,} | Prueba (desde 2010/11): {len(te_t):,}")
+
+filas_t = []
+media_cult_t = yt_tr.groupby(Xt_tr["cultivo"]).mean()
+filas_t.append(evaluar_reg("Baseline: media por cultivo", yt_te,
+                           Xt_te["cultivo"].map(media_cult_t).fillna(yt_tr.mean())))
+
+estimadores_t = {
+    "Regresión lineal": LinearRegression(),
+    "Random Forest": RandomForestRegressor(n_estimators=100, min_samples_leaf=5, n_jobs=-1, random_state=2026),
+    "XGBoost": XGBRegressor(n_estimators=400, learning_rate=0.08, max_depth=7, subsample=0.8,
+                            colsample_bytree=0.8, tree_method="hist", n_jobs=-1, random_state=2026),
+}
+for nombre, est in estimadores_t.items():
+    modelo_t = pipe_reg(est).fit(Xt_tr, yt_tr)
+    filas_t.append(evaluar_reg(nombre, yt_te, modelo_t.predict(Xt_te)))
+
+tabla_temporal = pd.DataFrame(filas_t)
+
+comparacion = (tabla_reg[["modelo", "RMSE", "R2"]].rename(columns={"RMSE": "RMSE_aleatoria", "R2": "R2_aleatoria"})
+               .merge(tabla_temporal[["modelo", "RMSE", "R2"]].rename(columns={"RMSE": "RMSE_temporal", "R2": "R2_temporal"}),
+                      on="modelo"))
+comparacion
+```
+
+**Cómo leerlo:** si el R² temporal es mucho menor que el de la partición aleatoria, el resultado aleatorio era optimista y la cifra
+realista para predecir campañas futuras es la temporal. Si ambos se parecen, el modelo es robusto. Completa la conclusión con tu tabla.
+
 # Problema 2: clasificación de la calidad
 
 La variable `calidad` tiene **3 clases** (Baja, Promedio, Alta), por lo que es un problema multiclase.
@@ -333,6 +375,8 @@ plt.show()
 #| label: seleccion
 print("Mejor regresor:", nombre_mejor_reg)
 print("Mejor clasificador:", nombre_mejor_clf)
+if tabla_clf.loc[tabla_clf.modelo == nombre_mejor_clf, "AUC_macro_OvR"].iloc[0] < 0.55:
+    print("Aviso: el AUC es cercano a 0.5; el modelo no se distingue de adivinar al azar.")
 ```
 
 **Interpretación del regresor** con importancia por permutación: cuánto empeora el error si se "desordena" cada variable.
@@ -385,12 +429,8 @@ Un valor desconocido no genera error: se codifica como categoría infrecuente.
 
 ## Conclusiones y limitaciones
 
+*(Completa con tus resultados.)*
 
-
-- **Regresión:** Random Forest (RMSE 1,318, MAE 602, R² 0.956) y XGBoost (1,322; 679; 0.956) superan por mucho a la regresión lineal (3,034; R² 0.767) y al baseline por cultivo (3,413; R² 0.705): 
-                 el error baja cerca de 61%. El R² es inusualmente alto y puede ser optimista por la partición aleatoria.
-- **Clasificación:** Todos los modelos obtienen AUC entre 0.499 y 0.503 y accuracy de 0.40, igual al baseline (0.401). La calidad no se puede predecir con estas variables. 
-                 El “mejor” modelo (One-vs-Rest, AUC 0.503) no se distingue del azar.
 - **Limitaciones:**
     - la partición aleatoria puede ser optimista porque el mismo departamento aparece en entrenamiento y prueba;
     - se excluyeron las filas imputadas y los ceros, por lo que el modelo solo aplica a cultivos con producción;

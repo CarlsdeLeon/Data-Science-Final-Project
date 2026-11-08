@@ -1,283 +1,443 @@
 ---
 title: "Fase 5 — Visualización de datos (R)"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    df-print: paged
+execute:
+  echo: true
+  warning: false
+  message: false
 ---
+
+# Preparación de los datos
+
+En esta fase se construyen visualizaciones para explorar la superficie cosechada, la producción y el rendimiento de los principales cultivos.
 
 ```{r}
 #| label: setup
+
 library(tidyverse)
 library(knitr)
 library(scales)
 
-theme_set(theme_minimal(base_size = 12))
+# Tema, colores y configuración del proyecto.
+source("r/tema.R")
+
+# Si tema.R no define esta variable, se toma la opción de R.
+# Por defecto se excluyen los registros con superficie imputada.
+if (!exists("usar_imputadas")) {
+  usar_imputadas <- getOption("agricultura.usar_imputadas", FALSE)
+}
 
 datos <- readRDS("data/agricultura_final.rds")
 
+# Comprobar que el archivo contiene las variables utilizadas en esta fase.
+columnas_requeridas <- c(
+  "sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn",
+  "rendimiento_wins_kg_ha", "sup_imputada", "cultivo",
+  "anio_inicio", "calidad"
+)
+
+faltantes <- setdiff(columnas_requeridas, names(datos))
+
+if (length(faltantes) > 0) {
+  stop(
+    "Faltan columnas requeridas en agricultura_final.rds: ",
+    paste(faltantes, collapse = ", ")
+  )
+}
+
 act <- datos |>
-  filter(sup_sembrada_ha > 0, sup_cosechada_ha > 0, produccion_tn > 0, rendimiento_wins_kg_ha > 0) |>
+  filter(
+    sup_sembrada_ha > 0,
+    sup_cosechada_ha > 0,
+    produccion_tn > 0,
+    rendimiento_wins_kg_ha > 0,
+    usar_imputadas | !sup_imputada
+  ) |>
   mutate(
     cultivo_g = fct_lump_n(factor(cultivo), 8),
     decada = factor(paste0(floor(anio_inicio / 10) * 10, "s"))
   )
+
+principales <- c("Soja", "Maiz", "Trigo", "Girasol", "Sorgo")
 ```
 
 ## 37. Gráficos de barras simples y agrupadas
 
-**Pregunta:** ¿qué cultivos ocupan más superficie en el país?
+### ¿Qué cultivos ocupan más superficie en el país?
 
 ```{r}
 #| label: barras-simple
+
 act |>
   group_by(cultivo) |>
-  summarise(sup_total_ha = sum(sup_cosechada_ha)) |>
-  slice_max(sup_total_ha, n = 10) |>
+  summarise(
+    sup_total_ha = sum(sup_cosechada_ha, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  slice_max(sup_total_ha, n = 10, with_ties = FALSE) |>
   ggplot(aes(reorder(cultivo, sup_total_ha), sup_total_ha)) +
   geom_col(fill = "#2E6F40") +
   scale_y_continuous(labels = label_number(scale = 1e-6, suffix = " M")) +
   coord_flip() +
-  labs(title = "Superficie cosechada acumulada por cultivo (1969/70 – 2016/17)",
-       x = NULL, y = "Superficie acumulada (millones de hectáreas)")
+  labs(
+    title = "Superficie cosechada acumulada por cultivo (1969/70–2016/17)",
+    x = NULL,
+    y = "Superficie acumulada (millones de hectáreas)"
+  )
 ```
 
-**Interpretación:** *(describe qué cultivos lideran y qué diferencia hay entre ellos).*
+**Interpretación:** La soja es el cultivo con más superficie cosechada acumulada (~375 M de ha), seguida del trigo (~245 M), maíz (~148 M), girasol (~97 M) y sorgo (~55 M); el resto no pasa de ~20 M.
 
-**Pregunta:** ¿cómo cambió la superficie de los cultivos principales por década?
+### ¿Cómo cambió la superficie de los cultivos principales por década?
 
 ```{r}
 #| label: barras-agrupadas
-principales <- c("Soja", "Maiz", "Trigo", "Girasol", "Sorgo")
 
 act |>
   filter(cultivo %in% principales) |>
   group_by(decada, cultivo) |>
-  summarise(sup_media_anual_ha = sum(sup_cosechada_ha) / n_distinct(anio_inicio), .groups = "drop") |>
+  summarise(
+    sup_media_anual_ha = sum(sup_cosechada_ha, na.rm = TRUE) /
+      n_distinct(anio_inicio),
+    .groups = "drop"
+  ) |>
   ggplot(aes(decada, sup_media_anual_ha, fill = cultivo)) +
   geom_col(position = "dodge") +
   scale_y_continuous(labels = label_number(scale = 1e-6, suffix = " M")) +
-  labs(title = "Superficie cosechada media anual por década",
-       x = "Década", y = "Superficie (millones de hectáreas por año)", fill = "Cultivo")
+  labs(
+    title = "Superficie cosechada media anual por década",
+    x = "Década",
+    y = "Superficie (millones de hectáreas por año)",
+    fill = "Cultivo"
+  )
 ```
 
-**Interpretación:** *(qué cultivo creció o cayó entre décadas).*
+**Interpretación:** Por década, la soja pasó de casi 0 en los 60 a ~18.7 M ha/año en los 2010s. El trigo se mantuvo entre 4.3 y 5.6 M, el maíz bajó a ~2.6 M en los 2000s y se recuperó a ~4.8 M, y el sorgo cayó de ~1.9 M a ~0.5–0.8 M.
 
 ## 38. Histogramas
 
-**Pregunta:** ¿cómo se distribuye el rendimiento y la superficie cosechada?
+### ¿Cómo se distribuyen el rendimiento y la superficie cosechada?
 
 ```{r}
 #| label: histogramas
+
 act |>
   filter(cultivo == "Soja") |>
   ggplot(aes(rendimiento_wins_kg_ha)) +
   geom_histogram(bins = 40, fill = "#3A7CA5", color = "white") +
   scale_x_continuous(labels = comma) +
-  labs(title = "Distribución del rendimiento de la soja",
-       x = "Rendimiento (kg/ha)", y = "Número de registros")
+  labs(
+    title = "Distribución del rendimiento de la soja",
+    x = "Rendimiento (kg/ha)",
+    y = "Número de registros"
+  )
 
 ggplot(act, aes(sup_cosechada_ha)) +
   geom_histogram(bins = 40, fill = "#3A7CA5", color = "white") +
   scale_x_log10(labels = comma) +
-  labs(title = "Distribución de la superficie cosechada (escala logarítmica)",
-       x = "Superficie cosechada (ha, escala log)", y = "Número de registros")
+  labs(
+    title = "Distribución de la superficie cosechada (escala logarítmica)",
+    x = "Superficie cosechada (ha, escala log)",
+    y = "Número de registros"
+  )
 ```
 
-**Interpretación:** *(forma de la distribución; por qué se usa escala logarítmica para la superficie).*
+**Interpretación:** El rendimiento de la soja se concentra entre 1,000 y 3,000 kg/ha, con moda cerca de 2,000 y cola derecha. La barra alta en 4,000 es efecto de la winsorización. La superficie cosechada es muy asimétrica (de 3 a más de 100,000 ha); en escala logarítmica toma forma de campana, centrada entre ~100 y ~10,000 ha.
 
 ## 39. Diagramas de caja y bigotes
 
-**Pregunta:** ¿qué cultivos tienen mayor rendimiento y mayor variabilidad?
+### ¿Qué cultivos tienen mayor rendimiento y mayor variabilidad?
 
 ```{r}
 #| label: boxplots
+
 act |>
-  ggplot(aes(reorder(cultivo_g, rendimiento_wins_kg_ha, median), rendimiento_wins_kg_ha)) +
-  geom_boxplot(fill = "#F2C14E", outlier.alpha = 0.2, outlier.size = 0.6) +
+  ggplot(
+    aes(
+      reorder(cultivo_g, rendimiento_wins_kg_ha, median),
+      rendimiento_wins_kg_ha
+    )
+  ) +
+  geom_boxplot(
+    fill = "#F2C14E",
+    outlier.alpha = 0.2,
+    outlier.size = 0.6
+  ) +
   scale_y_log10(labels = comma) +
   coord_flip() +
-  labs(title = "Rendimiento por cultivo", x = NULL, y = "Rendimiento (kg/ha, escala logarítmica)")
+  labs(
+    title = "Rendimiento por cultivo",
+    x = NULL,
+    y = "Rendimiento (kg/ha, escala logarítmica)"
+  )
 ```
 
-**Pregunta:** ¿el rendimiento cambia con la calidad registrada?
+### ¿El rendimiento cambia con la calidad registrada?
 
 ```{r}
 #| label: boxplot-calidad
+
 act |>
   filter(cultivo %in% c("Soja", "Maiz", "Trigo")) |>
   ggplot(aes(calidad, rendimiento_wins_kg_ha, fill = calidad)) +
   geom_boxplot(show.legend = FALSE, outlier.alpha = 0.2) +
   facet_wrap(~cultivo, scales = "free_y") +
   scale_y_continuous(labels = comma) +
-  labs(title = "Rendimiento según calidad, por cultivo", x = "Calidad", y = "Rendimiento (kg/ha)")
+  labs(
+    title = "Rendimiento según calidad, por cultivo",
+    x = "Calidad",
+    y = "Rendimiento (kg/ha)"
+  )
 ```
 
-**Interpretación:** *(qué cultivos difieren más y si la calidad se asocia al rendimiento).*
+**Interpretación:** Cebolla (mediana ~10,000 kg/ha) y papa (~9,000) lideran; sorgo (~3,200) y maíz (~3,000) superan a soja (~2,000), trigo (~1,800), avena (~1,400) y girasol (~1,350). “Other” tiene la mayor dispersión (de ~100 a ~80,000 kg/ha) porque agrupa muchos cultivos. Según la calidad, las medianas son prácticamente iguales en maíz, soja y trigo: la calidad no se asocia al rendimiento.
 
 ## 40. Diagramas de dispersión
 
-**Pregunta:** ¿qué tan fuerte es la relación entre superficie cosechada y producción?
+### ¿Qué tan fuerte es la relación entre superficie cosechada y producción?
 
 ```{r}
 #| label: dispersion
+
 set.seed(2026)
 
 act |>
-  slice_sample(n = 20000) |>
+  slice_sample(n = min(20000, nrow(act))) |>
   ggplot(aes(sup_cosechada_ha, produccion_tn, color = cultivo_g)) +
   geom_point(alpha = 0.3, size = 0.8) +
-  geom_smooth(aes(group = 1), method = "lm", color = "black", se = FALSE) +
+  geom_smooth(
+    aes(group = 1),
+    method = "lm",
+    color = "black",
+    se = FALSE
+  ) +
   scale_x_log10(labels = comma) +
   scale_y_log10(labels = comma) +
-  labs(title = "Superficie cosechada vs. producción (muestra de 20,000 registros)",
-       x = "Superficie cosechada (ha, escala log)", y = "Producción (tn, escala log)", color = "Cultivo")
+  labs(
+    title = "Superficie cosechada vs. producción (muestra de hasta 20,000 registros)",
+    x = "Superficie cosechada (ha, escala log)",
+    y = "Producción (tn, escala log)",
+    color = "Cultivo"
+  )
 ```
 
-**Interpretación:** *(la relación es casi lineal en escala log; los cultivos se separan en "bandas" según su rendimiento).*
+**Interpretación:** Superficie cosechada y producción tienen relación casi lineal en escala log-log (pendiente cercana a 1), coherente con \(r = 0.935\). La nube es ancha porque cada cultivo tiene un rendimiento distinto: cebolla y papa quedan arriba (más toneladas por ha), avena y girasol abajo.
 
 ## 41. Gráficos de líneas y tendencias
 
-**Pregunta:** ¿cómo evolucionó el rendimiento nacional de los cultivos principales?
+### ¿Cómo evolucionó el rendimiento nacional de los cultivos principales?
 
-El rendimiento nacional se calcula como producción total ÷ superficie cosechada total (un promedio ponderado,
-más correcto que promediar los rendimientos de cada departamento).
+El rendimiento nacional se calcula como producción total dividida entre superficie cosechada total. Es un promedio ponderado y resulta más apropiado que promediar los rendimientos de cada departamento.
 
 ```{r}
 #| label: lineas-rendimiento
+
 rend_nacional <- act |>
   filter(cultivo %in% principales) |>
   group_by(anio_inicio, cultivo) |>
-  summarise(rend_kg_ha = sum(produccion_tn) / sum(sup_cosechada_ha) * 1000, .groups = "drop")
+  summarise(
+    rend_kg_ha = sum(produccion_tn, na.rm = TRUE) /
+      sum(sup_cosechada_ha, na.rm = TRUE) * 1000,
+    .groups = "drop"
+  )
 
 ggplot(rend_nacional, aes(anio_inicio, rend_kg_ha, color = cultivo)) +
   geom_line(linewidth = 0.8) +
-  geom_smooth(method = "lm", se = FALSE, linetype = "dashed", linewidth = 0.5) +
+  geom_smooth(
+    method = "lm",
+    se = FALSE,
+    linetype = "dashed",
+    linewidth = 0.5
+  ) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Rendimiento nacional por campaña (línea punteada = tendencia lineal)",
-       x = "Año de inicio de campaña", y = "Rendimiento (kg/ha)", color = "Cultivo")
+  labs(
+    title = "Rendimiento nacional por campaña (línea punteada = tendencia lineal)",
+    x = "Año de inicio de campaña",
+    y = "Rendimiento (kg/ha)",
+    color = "Cultivo"
+  )
 ```
 
-**Pregunta:** ¿cómo evolucionó la superficie cosechada total?
+### ¿Cómo evolucionó la superficie cosechada total?
 
 ```{r}
 #| label: lineas-superficie
+
 act |>
   filter(cultivo %in% principales) |>
   group_by(anio_inicio, cultivo) |>
-  summarise(sup_ha = sum(sup_cosechada_ha), .groups = "drop") |>
+  summarise(
+    sup_ha = sum(sup_cosechada_ha, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
   ggplot(aes(anio_inicio, sup_ha, color = cultivo)) +
   geom_line(linewidth = 0.8) +
   scale_y_continuous(labels = label_number(scale = 1e-6, suffix = " M")) +
-  labs(title = "Superficie cosechada nacional por campaña",
-       x = "Año de inicio de campaña", y = "Superficie (millones de hectáreas)", color = "Cultivo")
+  labs(
+    title = "Superficie cosechada nacional por campaña",
+    x = "Año de inicio de campaña",
+    y = "Superficie (millones de hectáreas)",
+    color = "Cultivo"
+  )
 ```
 
-**Interpretación:** *(qué cultivos mejoran su rendimiento en el tiempo y cuáles ganan o pierden superficie).*
+**Interpretación:** El rendimiento nacional creció en todos los cultivos: maíz de ~2,300 a ~7,500 kg/ha (el mayor aumento y la mayor variabilidad), sorgo de ~2,000 a ~4,700, soja de ~1,100 a ~3,000, trigo de ~1,300 a ~3,200 y girasol de ~800 a ~2,000. En superficie, la soja despega desde mediados de los 90 hasta ~19.5 M ha; el trigo oscila entre 4 y 7 M; el sorgo cae desde mediados de los 80; el girasol llega a ~4 M hacia 1998 y luego baja.
 
 ## 42. Gráficos circulares y porcentuales
 
-Los gráficos circulares solo son adecuados con **pocas categorías (hasta unas 6)** que sumen un total.
-Con más categorías o con diferencias pequeñas son difíciles de leer, y en esos casos se prefieren las barras.
-Aquí se usan para dos composiciones simples.
+Los gráficos circulares solo son adecuados con pocas categorías (hasta unas 6) que sumen un total.
 
 ```{r}
 #| label: circulares
+
 pie_plot <- function(df, cat, val, titulo) {
   df |>
-    mutate(pct = {{ val }} / sum({{ val }}), etiqueta = percent(pct, accuracy = 0.1)) |>
+    mutate(
+      pct = {{ val }} / sum({{ val }}, na.rm = TRUE),
+      etiqueta = percent(pct, accuracy = 0.1)
+    ) |>
     ggplot(aes(x = "", y = pct, fill = {{ cat }})) +
     geom_col(width = 1, color = "white") +
-    geom_text(aes(label = etiqueta), position = position_stack(vjust = 0.5), size = 3.5) +
+    geom_text(
+      aes(label = etiqueta),
+      position = position_stack(vjust = 0.5),
+      size = 3.5
+    ) +
     coord_polar("y") +
     theme_void() +
     labs(title = titulo, fill = NULL)
 }
 
-# Proporción de registros por nivel de calidad (3 categorías)
-act |> count(calidad, name = "n") |>
+# Proporción de registros por nivel de calidad (3 categorías).
+act |>
+  count(calidad, name = "n") |>
   pie_plot(calidad, n, "Distribución de registros por calidad")
 
-# Participación en la superficie cosechada acumulada (5 cultivos principales + resto)
+# Participación en la superficie cosechada acumulada
+# (5 cultivos principales + resto).
 act |>
-  mutate(cultivo_p = fct_lump_n(factor(cultivo), 5, w = sup_cosechada_ha)) |>
+  mutate(
+    cultivo_p = fct_lump_n(
+      factor(cultivo),
+      5,
+      w = sup_cosechada_ha
+    )
+  ) |>
   group_by(cultivo_p) |>
-  summarise(sup = sum(sup_cosechada_ha)) |>
-  pie_plot(cultivo_p, sup, "Participación en la superficie cosechada acumulada")
+  summarise(sup = sum(sup_cosechada_ha, na.rm = TRUE), .groups = "drop") |>
+  pie_plot(
+    cultivo_p,
+    sup,
+    "Participación en la superficie cosechada acumulada"
+  )
 ```
 
-**Interpretación:** *(qué proporción concentran los cultivos líderes; si la calidad está equilibrada).*
+**Interpretación:** La calidad se reparte en 19.9% Baja, 39.9% Promedio y 40.1% Alta. Por superficie acumulada: soja 35.4%, trigo 23.1%, maíz 14.0%, girasol 9.1%, sorgo 5.2% y otros 13.3%; soja y trigo suman 58.5%.
 
 ## 43. Gráficos de densidad y distribuciones
 
-**Pregunta:** ¿cómo se distribuye el rendimiento en distintos cultivos?
+### ¿Cómo se distribuye el rendimiento en distintos cultivos?
 
 ```{r}
 #| label: densidad-cultivos
+
 act |>
   filter(cultivo %in% c("Soja", "Maiz", "Trigo", "Girasol")) |>
   ggplot(aes(rendimiento_wins_kg_ha, fill = cultivo)) +
   geom_density(alpha = 0.4) +
   scale_x_continuous(labels = comma) +
-  labs(title = "Distribución del rendimiento por cultivo",
-       x = "Rendimiento (kg/ha)", y = "Densidad", fill = "Cultivo")
+  labs(
+    title = "Distribución del rendimiento por cultivo",
+    x = "Rendimiento (kg/ha)",
+    y = "Densidad",
+    fill = "Cultivo"
+  )
 ```
 
-**Pregunta:** ¿cambió la distribución del rendimiento de la soja entre décadas?
+### ¿Cambió la distribución del rendimiento de la soja entre décadas?
 
 ```{r}
 #| label: densidad-decadas
+
 act |>
   filter(cultivo == "Soja") |>
   ggplot(aes(rendimiento_wins_kg_ha, fill = decada)) +
   geom_density(alpha = 0.35) +
   scale_x_continuous(labels = comma) +
-  labs(title = "Distribución del rendimiento de la soja por década",
-       x = "Rendimiento (kg/ha)", y = "Densidad", fill = "Década")
+  labs(
+    title = "Distribución del rendimiento de la soja por década",
+    x = "Rendimiento (kg/ha)",
+    y = "Densidad",
+    fill = "Década"
+  )
 ```
 
-**Interpretación:** *(si la distribución se desplaza a la derecha con el tiempo, el rendimiento mejoró).*
+**Interpretación:** El girasol se concentra en rendimientos bajos (pico ~800 kg/ha), soja y trigo entre 1,500 y 2,000, y el maíz es mucho más disperso, con cola larga hasta más de 9,000. En la soja, el pico se desplaza de ~1,000 kg/ha en los 60 a ~2,500 en los 2010s y la curva se ensancha: mejora el rendimiento medio, pero aumenta la diferencia entre departamentos.
 
 ## 44. Visualizaciones segmentadas y por facetas
 
-**Pregunta:** ¿cómo evolucionó la mediana del rendimiento en cada cultivo?
+### ¿Cómo evolucionó la mediana del rendimiento en cada cultivo?
 
 ```{r}
 #| label: facetas-tendencia
 #| fig-height: 7
+
 act |>
   group_by(cultivo_g, anio_inicio) |>
-  summarise(mediana = median(rendimiento_wins_kg_ha), .groups = "drop") |>
+  summarise(
+    mediana = median(rendimiento_wins_kg_ha, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
   ggplot(aes(anio_inicio, mediana)) +
   geom_line(color = "#3A7CA5") +
-  geom_smooth(method = "lm", se = FALSE, color = "#B2182B", linewidth = 0.5) +
+  geom_smooth(
+    method = "lm",
+    se = FALSE,
+    color = "#B2182B",
+    linewidth = 0.5
+  ) +
   facet_wrap(~cultivo_g, scales = "free_y") +
   scale_y_continuous(labels = comma) +
-  labs(title = "Mediana del rendimiento por campaña y cultivo",
-       x = "Año de inicio de campaña", y = "Rendimiento mediano (kg/ha)")
+  labs(
+    title = "Mediana del rendimiento por campaña y cultivo",
+    x = "Año de inicio de campaña",
+    y = "Rendimiento mediano (kg/ha)"
+  )
 ```
 
-**Pregunta:** ¿cómo se reparte el rendimiento según cultivo y calidad?
+### ¿Cómo se reparte el rendimiento según cultivo y calidad?
 
 ```{r}
 #| label: facetas-calidad
+
 act |>
   filter(cultivo %in% c("Soja", "Maiz", "Trigo", "Girasol")) |>
   ggplot(aes(rendimiento_wins_kg_ha)) +
   geom_histogram(bins = 30, fill = "#2E6F40", color = "white") +
   facet_grid(calidad ~ cultivo, scales = "free") +
   scale_x_continuous(labels = comma) +
-  labs(title = "Distribución del rendimiento por calidad (filas) y cultivo (columnas)",
-       x = "Rendimiento (kg/ha)", y = "Número de registros")
+  labs(
+    title = "Distribución del rendimiento por calidad (filas) y cultivo (columnas)",
+    x = "Rendimiento (kg/ha)",
+    y = "Número de registros"
+  )
 ```
 
-**Interpretación:** *(qué cultivos muestran tendencia creciente y si la calidad cambia la forma de la distribución).*
+**Interpretación:** Todos los cultivos muestran tendencia creciente en su rendimiento mediano. La soja cae a ~1,200 kg/ha hacia 2008. Por calidad, las distribuciones tienen la misma forma en Baja, Promedio y Alta, y en soja y trigo hay una barra alta en el extremo derecho por la winsorización.
 
 ## 45. Composición de múltiples visualizaciones
-
-Se combinan varios gráficos en un solo panel con el paquete `patchwork`
-(instalar una vez con `install.packages("patchwork")`).
 
 ```{r}
 #| label: composicion
 #| fig-width: 11
 #| fig-height: 8
+
 library(patchwork)
 
 p1 <- rend_nacional |>
@@ -285,41 +445,55 @@ p1 <- rend_nacional |>
   ggplot(aes(anio_inicio, rend_kg_ha, color = cultivo)) +
   geom_line() +
   scale_y_continuous(labels = comma) +
-  labs(title = "Rendimiento nacional", x = "Campaña", y = "kg/ha", color = NULL)
+  labs(
+    title = "Rendimiento nacional",
+    x = "Campaña",
+    y = "kg/ha",
+    color = NULL
+  )
 
 p2 <- act |>
   filter(cultivo %in% principales) |>
   ggplot(aes(cultivo, rendimiento_wins_kg_ha)) +
   geom_boxplot(fill = "#F2C14E", outlier.alpha = 0.2) +
   scale_y_continuous(labels = comma) +
-  labs(title = "Rendimiento por cultivo", x = NULL, y = "kg/ha")
+  labs(
+    title = "Rendimiento por cultivo",
+    x = NULL,
+    y = "kg/ha"
+  )
 
 p3 <- ggplot(act, aes(sup_cosechada_ha)) +
   geom_histogram(bins = 40, fill = "#3A7CA5", color = "white") +
   scale_x_log10(labels = comma) +
-  labs(title = "Superficie cosechada por registro", x = "Hectáreas (escala log)", y = "Registros")
+  labs(
+    title = "Superficie cosechada por registro",
+    x = "Hectáreas (escala log)",
+    y = "Registros"
+  )
 
 (p1 | p2) / p3 +
-  plot_annotation(title = "Panorama del rendimiento y la superficie agrícola", tag_levels = "A")
+  plot_annotation(
+    title = "Panorama del rendimiento y la superficie agrícola",
+    tag_levels = "A"
+  )
 ```
 
-**Interpretación:** *(qué mensaje conjunto transmiten los tres gráficos).*
+**Interpretación:** Los tres paneles dicen que el rendimiento sube con el tiempo (A), que varía más en maíz y sorgo que en girasol o soja (B) y que la superficie por registro es muy asimétrica (C).
 
 ## 46. Visualizaciones interactivas
 
-Se desarrollan en Python con Plotly y PyGWalker en el capítulo `python/05b_interactiva_python.qmd`.
+Las visualizaciones interactivas se desarrollan en Python con Plotly y PyGWalker, en el capítulo `python/05b_interactiva_python.qmd`.
 
-## Conclusiones de la fase
+# Conclusiones de la fase
 
-La guía pide conclusiones por cada pregunta investigada. Completa esta tabla con lo que observes en los gráficos:
-
-| Pregunta | Gráfico | Conclusión |
-|----------|---------|------------|
-| ¿Qué cultivos ocupan más superficie? | 37, 42 | |
-| ¿Cómo cambió la superficie por década? | 37 | |
-| ¿Cómo se distribuyen rendimiento y superficie? | 38, 43 | |
-| ¿Qué cultivos son más variables? | 39 | |
-| ¿La calidad se asocia al rendimiento? | 39, 44 | |
-| ¿Qué tan fuerte es superficie vs. producción? | 40 | |
-| ¿Cómo evolucionó el rendimiento y la superficie? | 41, 44 | |
-| ¿Cambió la distribución del rendimiento con el tiempo? | 43 | |
+| Pregunta | Conclusión |
+|---|---|
+| ¿Qué cultivos ocupan más superficie? | Soja, trigo y maíz (soja y trigo suman 58.5%). |
+| ¿Cómo cambió la superficie por década? | La soja pasó de ~0 a ~18.7 M ha; sorgo y trigo se estancaron o bajaron. |
+| ¿Cómo se distribuyen rendimiento y superficie? | Rendimiento con cola derecha; superficie asimétrica, aproximadamente simétrica en escala logarítmica. |
+| ¿Qué cultivos son más variables? | Maíz entre los grandes; “Other” en general. |
+| ¿La calidad se asocia al rendimiento? | No: medianas y formas similares en las tres calidades. |
+| ¿Qué tan fuerte es superficie vs. producción? | Muy fuerte (\(r = 0.935\), pendiente ~1 en log-log). |
+| ¿Cómo evolucionaron el rendimiento y la superficie? | Rendimiento al alza en todos; la soja domina la superficie desde los 90. |
+| ¿Cambió la distribución con el tiempo? | Sí: en la soja se desplaza a la derecha y se ensancha. |

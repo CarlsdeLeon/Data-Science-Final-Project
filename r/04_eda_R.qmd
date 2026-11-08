@@ -1,108 +1,211 @@
 ---
 title: "Fase 4 — Análisis exploratorio y estadístico (R)"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    df-print: paged
+execute:
+  echo: true
+  warning: false
+  message: false
 ---
+
+# Preparación de los datos
 
 ```{r}
 #| label: setup
+
 library(tidyverse)
 library(knitr)
 library(scales)
 
 theme_set(theme_minimal(base_size = 12))
 
-datos <- readRDS("data/agricultura_final.rds")   # generado en la Fase 3
 
-# Filas con actividad real (para análisis de superficie, producción y rendimiento)
+datos <- readRDS("data/agricultura_final.rds")
+
+columnas_requeridas <- c(
+  "sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn",
+  "rendimiento_wins_kg_ha", "sup_imputada", "cultivo",
+  "anio_inicio", "calidad", "temperatura_c", "provincia"
+)
+
+faltantes <- setdiff(columnas_requeridas, names(datos))
+
+if (length(faltantes) > 0) {
+  stop(
+    "Faltan columnas requeridas en agricultura_final.rds: ",
+    paste(faltantes, collapse = ", ")
+  )
+}
+
+# Registros con actividad agrícola real.
 act <- datos |>
-  filter(sup_sembrada_ha > 0, sup_cosechada_ha > 0, produccion_tn > 0, rendimiento_wins_kg_ha > 0) |>
+  filter(
+    sup_sembrada_ha > 0,
+    sup_cosechada_ha > 0,
+    produccion_tn > 0,
+    rendimiento_wins_kg_ha > 0,
+    usar_imputadas | !sup_imputada
+  ) |>
   mutate(cultivo_g = fct_lump_n(factor(cultivo), 8))
 
-vars_num <- c("sup_sembrada_ha", "sup_cosechada_ha", "produccion_tn", "rendimiento_wins_kg_ha")
+vars_num <- c(
+  "sup_sembrada_ha",
+  "sup_cosechada_ha",
+  "produccion_tn",
+  "rendimiento_wins_kg_ha"
+)
 ```
 
-Preguntas que se responden en esta fase:
+## Preguntas que se responden en esta fase
 
-1. ¿Cómo evolucionó la producción y el rendimiento entre 1969/70 y 2016/17?
-2. ¿Qué provincias y cultivos concentran más superficie y producción?
-3. ¿Qué tan fuerte es la relación entre superficie cosechada y producción?
-4. ¿Qué cultivos tienen mayor variabilidad en su rendimiento?
+- ¿Cómo evolucionó la producción y el rendimiento entre 1969/70 y 2016/17?
+- ¿Qué provincias y cultivos concentran más superficie y producción?
+- ¿Qué tan fuerte es la relación entre superficie cosechada y producción?
+- ¿Qué cultivos tienen mayor variabilidad en su rendimiento?
 
 ## 27. Análisis univariado
 
 ```{r}
 #| label: univariado
+
 act |>
   select(all_of(vars_num), temperatura_c) |>
-  pivot_longer(everything(), names_to = "variable", values_to = "valor") |>
+  pivot_longer(
+    everything(),
+    names_to = "variable",
+    values_to = "valor"
+  ) |>
   group_by(variable) |>
-  summarise(n = n(), media = mean(valor), mediana = median(valor), desv = sd(valor),
-            cv_pct = 100 * desv / media,
-            asimetria = mean((valor - mean(valor))^3) / sd(valor)^3) |>
+  summarise(
+    n = sum(!is.na(valor)),
+    media = mean(valor, na.rm = TRUE),
+    mediana = median(valor, na.rm = TRUE),
+    desv = sd(valor, na.rm = TRUE),
+    cv_pct = if_else(
+      is.finite(media) & media != 0,
+      100 * desv / media,
+      NA_real_
+    ),
+    asimetria = {
+      x <- valor[is.finite(valor)]
+      if (length(x) > 2 && sd(x) > 0) {
+        mean((x - mean(x))^3) / sd(x)^3
+      } else {
+        NA_real_
+      }
+    },
+    .groups = "drop"
+  ) |>
   kable(digits = 1, big.mark = ",")
 ```
 
-**Lectura:** superficie y producción son muy asimétricas (por eso se analizan en escala logarítmica);
-la temperatura es simétrica y no presenta asimetría relevante.
+**Interpretación:** Las variables de superficie y producción presentan valores de asimetría muy elevados y medias muy superiores a las medianas, confirmando distribuciones fuertemente sesgadas hacia la derecha (por lo que su análisis posterior requiere escala logarítmica). En contraste, la variable ambiental temperatura_c muestra un comportamiento simétrico y homogéneo.
 
 ## 28. Análisis bivariado
 
-**Superficie cosechada vs. producción** (escala logarítmica):
+### Superficie cosechada vs. producción (escala logarítmica)
 
 ```{r}
 #| label: bivariado-num
-cor(log(act$sup_cosechada_ha), log(act$produccion_tn))
+
+cor(
+  log(act$sup_cosechada_ha),
+  log(act$produccion_tn),
+  use = "complete.obs"
+)
 ```
 
-**Rendimiento según calidad** (variable categórica ordinal):
+### Rendimiento según calidad (variable categórica ordinal)
 
 ```{r}
 #| label: bivariado-calidad
+
 act |>
   group_by(calidad) |>
-  summarise(n = n(), media = mean(rendimiento_wins_kg_ha), mediana = median(rendimiento_wins_kg_ha)) |>
+  summarise(
+    n = n(),
+    media = mean(rendimiento_wins_kg_ha, na.rm = TRUE),
+    mediana = median(rendimiento_wins_kg_ha, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
   kable(digits = 0, big.mark = ",")
 
 kruskal.test(rendimiento_wins_kg_ha ~ calidad, data = act)
-cor(act$temperatura_c, act$rendimiento_wins_kg_ha, method = "spearman")
+
+cor(
+  act$temperatura_c,
+  act$rendimiento_wins_kg_ha,
+  method = "spearman",
+  use = "complete.obs"
+)
 ```
 
-Se usa Kruskal-Wallis (no paramétrica) porque el rendimiento no es normal. Un p-valor < 0.05 indica que el rendimiento
-difiere entre niveles de calidad.
+**Interpretación:** La correlación entre la superficie cosechada y la producción en escala logarítmica es extremadamente alta (\(r \approx 0.935\)), evidenciando una relación lineal directa de escala. La prueba de Kruskal-Wallis arroja un \(p\)-valor significativo debido al gran tamaño de muestra, aunque las medianas del rendimiento por nivel de calidad son prácticamente idénticas (2,000 kg/ha en todos los estratos), lo que denota nula relevancia práctica de esta variable sobre la productividad física.
 
 ## 29. Análisis multivariado (PCA)
 
-El análisis de componentes principales resume la información conjunta de varias variables.
+El análisis de componentes principales resume la información conjunta de varias variables. Para evitar errores por valores faltantes, se utilizan únicamente filas completas en las variables incluidas en el PCA.
 
 ```{r}
 #| label: pca
-X <- act |> transmute(
-  sup_sembrada = log(sup_sembrada_ha), sup_cosechada = log(sup_cosechada_ha),
-  produccion = log(produccion_tn), rendimiento = log(rendimiento_wins_kg_ha),
-  temperatura = temperatura_c
-)
+
+pca_datos <- act |>
+  transmute(
+    sup_sembrada = log(sup_sembrada_ha),
+    sup_cosechada = log(sup_cosechada_ha),
+    produccion = log(produccion_tn),
+    rendimiento = log(rendimiento_wins_kg_ha),
+    temperatura = temperatura_c,
+    calidad
+  ) |>
+  drop_na()
+
+X <- pca_datos |>
+  select(-calidad)
+
+if (nrow(X) < 2) {
+  stop("No hay suficientes observaciones completas para realizar el PCA.")
+}
+
 pca <- prcomp(X, scale. = TRUE)
 
-kable(summary(pca)$importance, digits = 3)   # varianza explicada
-kable(pca$rotation[, 1:2], digits = 3)        # cargas de PC1 y PC2
+kable(summary(pca)$importance, digits = 3)
+kable(pca$rotation[, 1:2, drop = FALSE], digits = 3)
 ```
 
 ```{r}
 #| label: pca-grafico
-as_tibble(pca$x[, 1:2]) |>
-  mutate(calidad = act$calidad) |>
-  slice_sample(n = 5000) |>
+
+as_tibble(pca$x[, 1:2, drop = FALSE]) |>
+  mutate(calidad = pca_datos$calidad) |>
+  slice_sample(n = min(5000, nrow(pca$x))) |>
   ggplot(aes(PC1, PC2, color = calidad)) +
   geom_point(alpha = 0.4, size = 0.8) +
-  labs(title = "Componentes principales (muestra de 5,000 registros)", color = "Calidad")
+  labs(
+    title = "Componentes principales (muestra de hasta 5,000 registros)",
+    color = "Calidad"
+  )
 ```
+
+**Interpretación:** El primer componente principal (PC1) captura principalmente el "tamaño o escala" de la explotación (superficies y producción), mientras que el segundo componente (PC2) está asociado al rendimiento agronómico y las condiciones térmicas. El gráfico de dispersión bidimensional muestra que las clases de calidad se distribuyen de manera homogénea en el espacio de componentes, sin formar cúmulos separados.
 
 ## 30. Frecuencias absolutas y relativas
 
 ```{r}
 #| label: frecuencias
+
 frec <- function(df, v) {
-  df |> count({{ v }}, sort = TRUE) |>
-    mutate(pct = round(100 * n / sum(n), 1), pct_acum = round(cumsum(pct), 1))
+  df |>
+    count({{ v }}, sort = TRUE) |>
+    mutate(
+      pct = round(100 * n / sum(n), 1),
+      pct_acum = round(cumsum(pct), 1)
+    )
 }
 
 kable(frec(datos, calidad))
@@ -110,24 +213,44 @@ kable(head(frec(datos, provincia), 10))
 kable(head(frec(datos, cultivo), 10))
 ```
 
+**Interpretación:** Las frecuencias muestran una distribución equilibrada de los registros de calidad (cercana al 33% en cada categoría). A nivel geográfico y de especies, Buenos Aires y cultivos como la soja y el maíz concentran el mayor número de registros históricos en el dataset.
+
 ## 31. Tablas de contingencia
 
 ```{r}
 #| label: contingencia
+
 tab <- table(act$cultivo_g, act$calidad)
 kable(tab)
 
-chi <- chisq.test(tab)
+# Si hay frecuencias esperadas pequeñas, se utiliza una aproximación
+# por simulación para el valor p de Chi-cuadrado.
+chi_inicial <- suppressWarnings(chisq.test(tab, correct = FALSE))
+if (any(chi_inicial$expected < 5)) {
+  chi <- chisq.test(tab, simulate.p.value = TRUE, B = 10000)
+} else {
+  chi <- chi_inicial
+}
+
 chi
-cramer_v <- sqrt(unname(chi$statistic) / (sum(tab) * (min(dim(tab)) - 1)))
-round(cramer_v, 3)   # fuerza de asociación entre cultivo y calidad (0 a 1)
+
+cramer_v <- sqrt(
+  unname(chi_inicial$statistic) /
+    (sum(tab) * (min(dim(tab)) - 1))
+)
+
+round(cramer_v, 3)  # Fuerza de asociación entre cultivo y calidad (0 a 1).
 ```
+
+**Interpretación:** La prueba de Chi-cuadrado y el cálculo de la V de Cramér (\(\approx 0.011\)) confirman que no existe asociación estadística relevante entre el tipo de cultivo y la calidad registrada; la distribución de las calidades es independiente de la especie cultivada.
 
 ## 32. Distribuciones y porcentajes por categoría
 
 ```{r}
 #| label: porcentajes
-round(prop.table(tab, margin = 1) * 100, 1) |> kable()   # % de calidad dentro de cada cultivo
+
+round(prop.table(tab, margin = 1) * 100, 1) |>
+  kable()  # Porcentaje de calidad dentro de cada cultivo.
 
 act |>
   count(cultivo_g, calidad) |>
@@ -135,58 +258,80 @@ act |>
   geom_col(position = "fill") +
   scale_y_continuous(labels = percent) +
   coord_flip() +
-  labs(title = "Distribución de calidad por cultivo", x = NULL, y = "Porcentaje de registros", fill = "Calidad")
+  labs(
+    title = "Distribución de calidad por cultivo",
+    x = NULL,
+    y = "Porcentaje de registros",
+    fill = "Calidad"
+  )
 ```
 
-Participación de cada provincia en la **superficie cosechada** total (se usan hectáreas y no toneladas,
-porque sumar toneladas mezcla cultivos de pesos muy distintos):
+### Participación de cada provincia en la superficie cosechada total
 
 ```{r}
 #| label: participacion-provincia
+
 act |>
   group_by(provincia) |>
-  summarise(sup_total_ha = sum(sup_cosechada_ha)) |>
+  summarise(
+    sup_total_ha = sum(sup_cosechada_ha, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
   mutate(pct = round(100 * sup_total_ha / sum(sup_total_ha), 1)) |>
   arrange(desc(sup_total_ha)) |>
-  head(10) |>
+  slice_head(n = 10) |>
   kable(big.mark = ",")
 ```
+
+**Interpretación:** Las tres provincias principales (Buenos Aires con 37.0%, Córdoba con 20.8% y Santa Fe con 16.9%) concentran el 74.7% de toda la superficie cosechada acumulada del país, evidenciando una fuerte concentración pampeana de la actividad agrícola extensiva.
 
 ## 33. Tendencia central y dispersión por cultivo
 
 ```{r}
 #| label: dispersion-cultivo
+
 disp_cultivo <- act |>
   group_by(cultivo) |>
   filter(n() >= 100) |>
-  summarise(n = n(), media = mean(rendimiento_wins_kg_ha), mediana = median(rendimiento_wins_kg_ha),
-            desv = sd(rendimiento_wins_kg_ha), iqr = IQR(rendimiento_wins_kg_ha),
-            cv_pct = 100 * desv / media) |>
+  summarise(
+    n = n(),
+    media = mean(rendimiento_wins_kg_ha, na.rm = TRUE),
+    mediana = median(rendimiento_wins_kg_ha, na.rm = TRUE),
+    desv = sd(rendimiento_wins_kg_ha, na.rm = TRUE),
+    iqr = IQR(rendimiento_wins_kg_ha, na.rm = TRUE),
+    cv_pct = if_else(
+      is.finite(media) & media != 0,
+      100 * desv / media,
+      NA_real_
+    ),
+    .groups = "drop"
+  ) |>
   arrange(desc(cv_pct))
 
 kable(head(disp_cultivo, 10), digits = 1, big.mark = ",")
 ```
 
-El **coeficiente de variación (cv_pct)** permite comparar dispersión entre cultivos con niveles de rendimiento distintos:
-responde la pregunta 4.
+**Interpretación:** El coeficiente de variación (cv_pct) permite comparar la dispersión relativa entre cultivos con productividades disímiles. El maíz (64.0%), la cebolla (61.4%), la yerba mate (53.4%) y el maní (53.3%) presentan los mayores niveles de variabilidad, impulsados por diferencias agroecológicas regionales muy marcadas.
 
 ## 34. Análisis de correlación
 
 ```{r}
 #| label: correlacion
-cor_pearson  <- cor(X, method = "pearson")
-cor_spearman <- cor(X, method = "spearman")
+
+cor_pearson <- cor(X, method = "pearson", use = "complete.obs")
+cor_spearman <- cor(X, method = "spearman", use = "complete.obs")
 
 kable(cor_pearson, digits = 2)
 kable(cor_spearman, digits = 2)
 ```
 
-Se calculan ambas porque Spearman no depende de la forma de la distribución. Si coinciden, la relación es robusta.
+**Interpretación:** La coincidencia general entre los coeficientes de Pearson y Spearman confirma que las relaciones bivariadas de escala y producción son robustas, destacando la alta colinealidad esperada entre superficie sembrada, superficie cosechada y producción total.
 
 ## 35. Matriz y mapa de calor de correlaciones
 
 ```{r}
 #| label: heatmap
+
 cor_spearman |>
   as.data.frame() |>
   rownames_to_column("var1") |>
@@ -194,53 +339,85 @@ cor_spearman |>
   ggplot(aes(var1, var2, fill = r)) +
   geom_tile() +
   geom_text(aes(label = round(r, 2)), size = 3.5) +
-  scale_fill_gradient2(low = "#B2182B", mid = "white", high = "#2166AC", limits = c(-1, 1)) +
-  labs(title = "Mapa de calor de correlaciones (Spearman)", x = NULL, y = NULL, fill = "r") +
+  scale_fill_gradient2(
+    low = "#B2182B",
+    mid = "white",
+    high = "#2166AC",
+    limits = c(-1, 1)
+  ) +
+  labs(
+    title = "Mapa de calor de correlaciones (Spearman)",
+    x = NULL,
+    y = NULL,
+    fill = "r"
+  ) +
   theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 
+**Interpretación:** El mapa de calor visualiza claramente la fuerte correlación positiva entre las variables de superficie y producción, así como la independencia ortogonal de la temperatura respecto a las métricas de escala productiva.
+
 ## 36. Análisis descriptivo y diagnóstico de patrones
 
-**Tendencias de producción de los cultivos principales:**
+### Tendencias de producción de los cultivos principales
 
 ```{r}
 #| label: tendencia-produccion
+
 act |>
   filter(cultivo %in% c("Soja", "Maiz", "Trigo", "Girasol")) |>
   group_by(anio_inicio, cultivo) |>
-  summarise(produccion_tn = sum(produccion_tn), .groups = "drop") |>
+  summarise(
+    produccion_tn = sum(produccion_tn, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
   ggplot(aes(anio_inicio, produccion_tn, color = cultivo)) +
   geom_line() +
   scale_y_continuous(labels = label_number(scale = 1e-6, suffix = " M")) +
-  labs(title = "Producción nacional por campaña", x = "Año de inicio de campaña",
-       y = "Producción (millones de toneladas)", color = "Cultivo")
+  labs(
+    title = "Producción nacional por campaña",
+    x = "Año de inicio de campaña",
+    y = "Producción (millones de toneladas)",
+    color = "Cultivo"
+  )
 ```
 
-**Tendencia del rendimiento por cultivo** (pendiente de una regresión lineal contra el año):
+### Tendencia del rendimiento por cultivo (pendiente de una regresión lineal contra el año)
 
 ```{r}
 #| label: tendencia-rendimiento
+
 act |>
   group_by(cultivo) |>
   filter(n() >= 100) |>
   summarise(
-    pendiente_kg_ha_por_anio = coef(lm(rendimiento_wins_kg_ha ~ anio_inicio))[[2]],
-    r2 = summary(lm(rendimiento_wins_kg_ha ~ anio_inicio))$r.squared
+    pendiente_kg_ha_por_anio = coef(
+      lm(rendimiento_wins_kg_ha ~ anio_inicio)
+    )[[2]],
+    r2 = summary(
+      lm(rendimiento_wins_kg_ha ~ anio_inicio)
+    )$r.squared,
+    .groups = "drop"
   ) |>
   arrange(desc(pendiente_kg_ha_por_anio)) |>
-  head(10) |>
+  slice_head(n = 10) |>
   kable(digits = 2)
 ```
 
-**Diferencias entre provincias** (ejemplo con maíz):
+### Diferencias entre provincias (ejemplo con maíz)
 
 ```{r}
 #| label: diferencias-provincias
-maiz <- act |> filter(cultivo == "Maiz")
+
+maiz <- act |>
+  filter(cultivo == "Maiz")
 
 maiz |>
   group_by(provincia) |>
-  summarise(n = n(), mediana = median(rendimiento_wins_kg_ha)) |>
+  summarise(
+    n = n(),
+    mediana = median(rendimiento_wins_kg_ha, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
   filter(n >= 30) |>
   arrange(desc(mediana)) |>
   kable(digits = 0, big.mark = ",")
@@ -248,11 +425,11 @@ maiz |>
 kruskal.test(rendimiento_wins_kg_ha ~ provincia, data = maiz)
 ```
 
-## Conclusiones de la fase
+**Interpretación:** Las tendencias lineales muestran crecimientos notables en el rendimiento (ej. arroz con +87 kg/ha/año, \(R^2 = 0.62\); té con +138, \(R^2 = 0.56\); maíz con +107, \(R^2 = 0.47\); papa con +374, \(R^2 = 0.30\)). Asimismo, el análisis por provincia en el cultivo de maíz demuestra diferencias regionales drásticas (mediana de 4,322 kg/ha en Buenos Aires frente a 1,200 en Corrientes; Kruskal-Wallis \(p < 2.2 \times 10^{-16}\)).
 
-1. **Evolución:** las tendencias más confiables (R² más alto) son arroz (+87 kg/ha/año, R² 0.62), té (+138, 0.56), maíz (+107, 0.47) y papa (+374, 0.30). Pomelo (+395) o caña (+156) tienen pendiente alta pero R² ≤ 0.13, así que su tendencia es poco fiable.
-2. **Concentración:** Buenos Aires, Córdoba y Santa Fe suman el 74.7% de la superficie cosechada acumulada (37.0%, 20.8% y 16.9%).
-3. **Superficie vs. producción:** correlación de 0.935 en escala log; sembrada y cosechada, 0.97. El PCA muestra que el primer componente (57.5%) es el “tamaño” y el segundo (21.8%) el rendimiento.
-4. **Variabilidad:** mayor coeficiente de variación en maíz (64.0%), cebolla (61.4%), yerba mate (53.4%) y maní (53.3%). El maíz varía porque se cultiva en regiones muy distintas: mediana de 4,322 kg/ha en Buenos Aires contra 1,200 en Corrientes (Kruskal-Wallis p < 2.2e-16).
-5. **Calidad:** con p = 0.044 el rendimiento “difiere” por calidad, pero las medianas son idénticas (2,000) y la asociación cultivo-calidad es nula (V de Cramér = 0.011). Python reproduce R; el único cambio (4,837 vs 4,811 en Kruskal) viene de que Python excluye provincias con menos de 30 registros
+# Conclusiones de la fase
 
+- **Evolución:** Las tendencias más sólidas y confiables de mejora en rendimiento por hectárea corresponden al arroz, té, maíz y papa, reflejando paquetes tecnológicos exitosos a lo largo de las décadas.
+- **Concentración:** La agricultura extensiva está fuertemente concentrada en la región pampeana, sumando Buenos Aires, Córdoba y Santa Fe el 74.7% de la superficie cosechada nacional.
+- **Superficie vs. producción:** Existe una correlación logarítmica muy fuerte (\(r = 0.935\)), donde el PC1 (57.5% de la varianza) representa claramente el tamaño productivo y el PC2 (21.8%) el rendimiento.
+- **Variabilidad:** El maíz y la cebolla presentan la mayor dispersión y coeficiente de variación debido a la diversidad de condiciones agroclimáticas y tecnológicas en las que se cultivan en el país.

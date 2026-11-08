@@ -19,8 +19,10 @@ pd.set_option("display.float_format", "{:,.2f}".format)
 
 datos = pd.read_csv("data/agricultura_final.csv")   # generado en la Fase 3 (R)
 
+USAR_IMPUTADAS = False   # True = incluir las 3,201 filas imputadas (frutales 1969/70 a 1975/76)
 act = datos[(datos.sup_sembrada_ha > 0) & (datos.sup_cosechada_ha > 0) &
-            (datos.produccion_tn > 0) & (datos.rendimiento_wins_kg_ha > 0)].copy()
+            (datos.produccion_tn > 0) & (datos.rendimiento_wins_kg_ha > 0) &
+            (USAR_IMPUTADAS | ~datos.sup_imputada.astype(bool))].copy()
 act["calidad"] = pd.Categorical(act["calidad"], categories=["Baja", "Promedio", "Alta"], ordered=True)
 
 top8 = act["cultivo"].value_counts().head(8).index

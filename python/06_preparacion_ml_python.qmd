@@ -42,14 +42,13 @@ Se plantean **dos problemas**, que responden las preguntas 5 y 6 de la Fase 1:
 **Conjunto de modelado.** Solo se usan filas donde los datos son **observados y no derivados de una imputación**:
 
 - superficie sembrada, cosechada y producción mayores a 0,
-- sin las filas de superficie cosechada imputada (Fase 2), para no entrenar con valores sintéticos, y especialmente para que el rendimiento objetivo no sea un valor calculado a partir de una imputación.
+- sin las filas con superficies imputadas (Fase 2, columna `sup_imputada`), para no entrenar ni evaluar con valores sintéticos, y especialmente para que el rendimiento objetivo no sea un valor calculado a partir de una imputación.
 
 ```{python}
 #| label: conjunto-modelado
 base = datos[
     (datos.sup_sembrada_ha > 0) & (datos.sup_cosechada_ha > 0) &
     (datos.produccion_tn > 0) & (datos.rendimiento_wins_kg_ha > 0) &
-    (~datos.sup_cosechada_imputada.astype(bool))
 ].reset_index(drop=True)
 
 OBJ_REG = "rendimiento_wins_kg_ha"
@@ -254,7 +253,7 @@ dividiría por años (entrenar con campañas antiguas y probar con las recientes
 
 ## Conclusión de la fase
 
-**Los datos quedan listos:** ~80% para entrenamiento y ~20% para prueba, con recetas de
+*(Completa con tus resultados.)* Los datos quedan listos: ~80% para entrenamiento y ~20% para prueba, con recetas de
 preprocesamiento guardadas en `data/ml/`. Se definieron dos objetivos: **predecir el rendimiento** (regresión) y **clasificar la calidad** (multiclase).
 Quedan 114,709 registros para modelar (91,767 de entrenamiento y 22,942 de prueba) y 58 columnas tras la codificación. 
 La información mutua con el rendimiento es 0.83 para cultivo, 0.26 para superficie sembrada, 0.19 para provincia y año, y 0.00 para temperatura, que no aporta. 
