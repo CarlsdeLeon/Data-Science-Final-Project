@@ -1,19 +1,8 @@
 ---
 title: "Fase 5 — Visualización de datos (R)"
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    number-sections: true
-    code-fold: false
-    df-print: paged
-execute:
-  echo: true
-  warning: false
-  message: false
 ---
 
-# Preparación de los datos
+## Preparación de los datos
 
 En esta fase se construyen visualizaciones para explorar la superficie cosechada, la producción y el rendimiento de los principales cultivos.
 
@@ -227,7 +216,7 @@ act |>
   )
 ```
 
-**Interpretación:** Superficie cosechada y producción tienen relación casi lineal en escala log-log (pendiente cercana a 1), coherente con \(r = 0.935\). La nube es ancha porque cada cultivo tiene un rendimiento distinto: cebolla y papa quedan arriba (más toneladas por ha), avena y girasol abajo.
+**Interpretación:** Superficie cosechada y producción tienen relación casi lineal en escala log-log (pendiente cercana a 1), coherente con $r = 0.935$. La nube es ancha porque cada cultivo tiene un rendimiento distinto: cebolla y papa quedan arriba (más toneladas por ha), avena y girasol abajo.
 
 ## 41. Gráficos de líneas y tendencias
 
@@ -485,7 +474,7 @@ p3 <- ggplot(act, aes(sup_cosechada_ha)) +
 
 Las visualizaciones interactivas se desarrollan en Python con Plotly y PyGWalker, en el capítulo `python/05b_interactiva_python.qmd`.
 
-# Conclusiones de la fase
+## Conclusiones de la fase
 
 | Pregunta | Conclusión |
 |---|---|
@@ -494,6 +483,6 @@ Las visualizaciones interactivas se desarrollan en Python con Plotly y PyGWalker
 | ¿Cómo se distribuyen rendimiento y superficie? | Rendimiento con cola derecha; superficie asimétrica, aproximadamente simétrica en escala logarítmica. |
 | ¿Qué cultivos son más variables? | Maíz entre los grandes; “Other” en general. |
 | ¿La calidad se asocia al rendimiento? | No: medianas y formas similares en las tres calidades. |
-| ¿Qué tan fuerte es superficie vs. producción? | Muy fuerte (\(r = 0.935\), pendiente ~1 en log-log). |
+| ¿Qué tan fuerte es superficie vs. producción? | Muy fuerte ($r = 0.935$, pendiente ~1 en log-log). |
 | ¿Cómo evolucionaron el rendimiento y la superficie? | Rendimiento al alza en todos; la soja domina la superficie desde los 90. |
 | ¿Cambió la distribución con el tiempo? | Sí: en la soja se desplaza a la derecha y se ensancha. |
