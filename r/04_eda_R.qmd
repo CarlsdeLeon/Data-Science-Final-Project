@@ -24,6 +24,10 @@ library(scales)
 
 theme_set(theme_minimal(base_size = 12))
 
+# Valor predeterminado si tema.R no define usar_imputadas.
+if (!exists("usar_imputadas")) {
+  usar_imputadas <- getOption("agricultura.usar_imputadas", FALSE)
+}
 
 datos <- readRDS("data/agricultura_final.rds")
 

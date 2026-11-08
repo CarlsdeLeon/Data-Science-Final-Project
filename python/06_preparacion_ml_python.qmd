@@ -49,6 +49,7 @@ Se plantean **dos problemas**, que responden las preguntas 5 y 6 de la Fase 1:
 base = datos[
     (datos.sup_sembrada_ha > 0) & (datos.sup_cosechada_ha > 0) &
     (datos.produccion_tn > 0) & (datos.rendimiento_wins_kg_ha > 0) &
+    (~datos.sup_imputada.astype(bool))
 ].reset_index(drop=True)
 
 OBJ_REG = "rendimiento_wins_kg_ha"
