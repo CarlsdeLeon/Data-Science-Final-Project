@@ -1,0 +1,83 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "e50b5d7508925c01cb7e",
+  "position": {
+    "x": 800,
+    "y": 136.66666666666669,
+    "z": 1003,
+    "height": 61.666666666666671,
+    "width": 420,
+    "tabOrder": 3
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Agricultura"
+                    }
+                  },
+                  "Property": "cultivo"
+                }
+              },
+              "queryRef": "Agricultura.cultivo",
+              "nativeQueryRef": "cultivo",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "data": [
+        {
+          "properties": {
+            "mode": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Dropdown'"
+                }
+              }
+            },
+            "isInvertedSelectionMode": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "general": [
+        {
+          "properties": {}
+        }
+      ]
+    }
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "e3fff28c051e9c00b1d1",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Agricultura"
+              }
+            },
+            "Property": "cultivo"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
+  }
+}

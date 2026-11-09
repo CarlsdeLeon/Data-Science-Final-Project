@@ -1,0 +1,116 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.7.0/schema.json",
+  "name": "70c483756cbf31c03cdd",
+  "position": {
+    "x": 20,
+    "y": 456,
+    "z": 1000,
+    "width": 760,
+    "height": 214,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "drillFilterOtherVisuals": true,
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Agricultura"
+                    }
+                  },
+                  "Property": "cultivo"
+                }
+              },
+              "queryRef": "Agricultura.cultivo",
+              "nativeQueryRef": "cultivo"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Agricultura"
+                    }
+                  },
+                  "Property": "Produccion tn"
+                }
+              },
+              "queryRef": "Agricultura.Produccion tn",
+              "nativeQueryRef": "Produccion tn"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Agricultura"
+                    }
+                  },
+                  "Property": "Superficie cosechada ha"
+                }
+              },
+              "queryRef": "Agricultura.Superficie cosechada ha",
+              "nativeQueryRef": "Superficie cosechada ha"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Agricultura"
+                    }
+                  },
+                  "Property": "Rendimiento ponderado kg ha"
+                }
+              },
+              "queryRef": "Agricultura.Rendimiento ponderado kg ha",
+              "nativeQueryRef": "Rendimiento ponderado kg ha"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Agricultura"
+                    }
+                  },
+                  "Property": "Participacion produccion"
+                }
+              },
+              "queryRef": "Agricultura.Participacion produccion",
+              "nativeQueryRef": "Participacion produccion"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Tabla resumen de cultivos'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

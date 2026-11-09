@@ -1,0 +1,78 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "f6e767aed547552b5c47",
+  "position": {
+    "x": 640,
+    "y": 202.603550295858,
+    "z": 1000,
+    "height": 142.01183431952663,
+    "width": 289.70414201183434,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Agricultura"
+                    }
+                  },
+                  "Property": "Rendimiento ponderado kg ha"
+                }
+              },
+              "queryRef": "Agricultura.Rendimiento ponderado kg ha",
+              "nativeQueryRef": "Rendimiento ponderado kg ha"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Rendimiento ponderado (kg/ha)'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "57653b350d099880e492",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Agricultura"
+              }
+            },
+            "Property": "Rendimiento ponderado kg ha"
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
+  }
+}
