@@ -429,14 +429,35 @@ Un valor desconocido no genera error: se codifica como categoría infrecuente.
 
 ## Conclusiones y limitaciones
 
-*(Completa con tus resultados.)*
+### Regresión del rendimiento
 
-- **Limitaciones:**
-    - la partición aleatoria puede ser optimista porque el mismo departamento aparece en entrenamiento y prueba;
-    - se excluyeron las filas imputadas y los ceros, por lo que el modelo solo aplica a cultivos con producción;
-    - el objetivo de regresión es el rendimiento winsorizado, no el original;
-    - Naive Bayes Gaussiano asume independencia y normalidad, supuestos que aquí no se cumplen.
+Los resultados muestran que los modelos basados en árboles obtuvieron el mejor desempeño para predecir el rendimiento agrícola. XGBoost alcanzó el menor RMSE, con aproximadamente 1,281.53 kg/ha, y un R² de 0.958, seguido muy de cerca por Random Forest, con un RMSE de 1,287.27 kg/ha y un R² de 0.958. Ambos modelos superaron a la regresión lineal y a los modelos de referencia.
 
-- **Desempeño en clasificación:** El hecho de que los clasificadores obtengan un AUC cercano a 0.50 demuestra empíricamente que la variable ordinal 
-                 calidad no guarda una relación lineal o determinista directa con las características agronómicas cuantitativas evaluadas, un hallazgo diagnóstico crucial 
-                 que evita falsas expectativas predictivas sobre datos cualitativos subjetivos.
+Al comparar XGBoost con el baseline de media por cultivo, se observa una mejora importante: el RMSE disminuyó de 3,377.62 a 1,281.53 kg/ha. Esto indica que el modelo logra aprovechar mejor las relaciones entre las variables disponibles para estimar el rendimiento.
+
+La importancia por permutación muestra que el cultivo es la variable más influyente, con un aumento aproximado de 7,750 kg/ha en el RMSE al desordenarla. Después aparecen la provincia, el año de inicio y la superficie sembrada. Por otro lado, la temperatura presentó una importancia prácticamente nula en este modelo, por lo que su aporte predictivo fue limitado dentro de las variables utilizadas.
+
+### Validación temporal
+
+La validación temporal permitió comprobar el comportamiento de los modelos al utilizar campañas antiguas para entrenar y campañas recientes para evaluar. Se utilizaron 102,299 registros de entrenamiento, correspondientes a campañas hasta 2009/10, y 12,410 registros de prueba, desde 2010/11.
+
+XGBoost obtuvo el mejor resultado temporal, con un RMSE de 991.24 kg/ha y un R² de 0.740. Random Forest también presentó un desempeño cercano, con un R² de 0.712. Aunque ambos modelos mostraron una reducción en su capacidad explicativa respecto a la partición aleatoria, conservaron un desempeño considerablemente mejor que la regresión lineal y el baseline por cultivo.
+
+Esto demuestra que los resultados de la partición aleatoria eran más optimistas, pero también que XGBoost y Random Forest mantienen una capacidad predictiva útil al evaluar campañas posteriores a las utilizadas durante el entrenamiento.
+
+### Clasificación de la calidad
+
+En la clasificación de calidad (Baja, Promedio y Alta), los resultados fueron considerablemente más limitados. La regresión logística One-vs-Rest obtuvo el mejor Accuracy, con 0.404, y un AUC macro de 0.503. Sin embargo, este último valor es prácticamente equivalente a 0.5, que representa un desempeño cercano al azar.
+
+La matriz de confusión permite observar un problema importante: el mejor clasificador no identificó correctamente ningún registro de la clase Baja y concentró sus predicciones en las clases Alta y Promedio. Por lo tanto, aunque el Accuracy fue ligeramente superior al baseline, el modelo no consiguió distinguir adecuadamente las tres categorías.
+
+En general, las variables disponibles permitieron obtener mejores resultados al predecir el rendimiento numérico que al clasificar la calidad agrícola. Esto sugiere que la información utilizada en este proyecto no es suficiente para distinguir de manera confiable las categorías de calidad.
+
+### Limitaciones
+
+- La partición aleatoria puede producir resultados optimistas debido a que los mismos departamentos aparecen en diferentes campañas dentro de entrenamiento y prueba.
+- La validación temporal ofrece una evaluación más cercana al uso real del modelo, aunque todavía no garantiza el mismo desempeño en campañas futuras.
+- Se excluyeron las filas imputadas y los registros con valores iguales o inferiores a cero en las variables productivas, por lo que los modelos se aplican principalmente a cultivos con producción registrada.
+- El objetivo de regresión corresponde al rendimiento winsorizado, por lo que las predicciones no representan directamente el rendimiento original sin tratamiento de valores extremos.
+- La clasificación de calidad tuvo un desempeño limitado, posiblemente porque las variables disponibles no contienen suficiente información para diferenciar las tres categorías.
+- La importancia de las variables representa su aporte predictivo dentro del modelo y no demuestra que exista una relación causal con el rendimiento.

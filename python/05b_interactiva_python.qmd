@@ -45,6 +45,12 @@ fig = px.line(
 fig.show()
 ```
 
+El maíz es el cultivo que más mejora su rendimiento, especialmente desde 1995.
+La soja y el trigo también presentan crecimiento, pero de manera más gradual.
+El sorgo creció durante varias décadas, pero después del 2000 se estabilizó y comenzó a fluctuar.
+El girasol es el que presenta menos crecimiento.
+Esto demuestra que no todos los cultivos han tenido la misma evolución en términos de productividad.
+
 ### Superficie vs. producción
 
 ```{python}
@@ -60,6 +66,11 @@ fig = px.scatter(
 )
 fig.show()
 ```
+
+La soja, el maíz y el trigo destacan por ocupar grandes superficies y alcanzar producciones elevadas.
+El girasol y el sorgo necesitan superficies considerables, pero sus rendimientos son relativamente menores.
+La papa y la cebolla destacan porque pueden alcanzar rendimientos elevados en superficies más pequeñas.
+La gráfica permite comparar los comportamientos de cultivos extensivos con otros que tienen una producción más concentrada por hectárea.
 
 ### Distribución del rendimiento por cultivo
 
@@ -98,6 +109,14 @@ fig = px.scatter(
 fig.show()
 ```
 
+La animación permite observar tres variables simultáneamente: superficie, rendimiento y producción.
+En los primeros años destacan la avena por su rendimiento y el girasol por su desplazamiento hacia mayores superficies.
+Durante los años 80, la cebada cervecera y la soja muestran cambios importantes.
+En los años 90, la soja comienza a destacar por su expansión y el maíz por su rendimiento.
+Entre 1997 y 1998 se observa una caída general en varios cultivos. Coincide con un episodio intenso de El Niño, aunque no podemos asegurar que sea la causa.
+Después del 2000, la soja continúa expandiéndose y el maíz vuelve a destacar por su crecimiento.
+Hacia 2010, el maíz presenta cambios importantes en las tres variables.
+
 ## Exploración interactiva con PyGWalker
 
 PyGWalker permite arrastrar variables a ejes y colores, como en una herramienta de BI, sin escribir código.
@@ -116,11 +135,65 @@ except ImportError:
     print("PyGWalker no está instalado. Ejecuta: pip install pygwalker")
 ```
 
+PyGWalker permite explorar los datos sin tener que programar cada gráfica.
+Encontramos una correlación aproximada de 0.94 entre superficie cosechada y producción.
+También encontramos una correlación de 0.997 entre superficie sembrada y cosechada.
+La temperatura no mostró una relación lineal clara con el rendimiento en esta exploración.
+Es importante aclarar que una correlación no demuestra causalidad y que estos resultados corresponden a los registros agrupados disponibles.
+
+
 ## Interpretación y conclusiones
 
-*(Completa con lo que observes al explorar los gráficos.)*
+## 8.3 Interpretación y conclusiones
 
-- **Rendimiento nacional:** ¿qué cultivos muestran una mejora sostenida y desde qué campaña?
-- **Superficie vs. producción:** ¿qué cultivos se salen de la nube principal y por qué?
-- **Animación:** ¿qué cultivos se desplazan más hacia arriba (mayor rendimiento) o a la derecha (mayor superficie)?
-- **PyGWalker:** describe al menos una relación nueva que hayas encontrado explorando.
+### Rendimiento nacional
+
+Al analizar la evolución del rendimiento de los principales cultivos, se observa que el maíz presenta el crecimiento más destacado durante el periodo estudiado. Su mejora comienza a ser evidente alrededor de 1990 y se intensifica a partir de 1995, alcanzando valores superiores a los 7,500 kg/ha hacia el final del registro.
+
+El trigo muestra una tendencia ascendente más gradual, especialmente desde 1980, mientras que la soja consolida su crecimiento alrededor de 1989-1990 y mantiene una evolución positiva durante las siguientes décadas.
+
+Por otro lado, el sorgo presenta un crecimiento importante entre 1975 y 2000, pero posteriormente su rendimiento deja de mostrar una mejora sostenida y comienza a presentar fluctuaciones. El girasol, en comparación con los demás cultivos, mantiene un comportamiento relativamente estable y un crecimiento más lento.
+
+En general, el maíz destaca por su incremento en el rendimiento, mientras que el trigo y la soja también muestran mejoras importantes a largo plazo.
+
+### Superficie cosechada y producción
+
+La comparación entre superficie cosechada y producción permite identificar diferencias importantes entre los cultivos. La soja destaca por alcanzar algunas de las mayores superficies cosechadas, seguida de cerca por el maíz y el trigo. Estos cultivos también presentan volúmenes elevados de producción, lo que refleja su importancia dentro de la actividad agrícola analizada.
+
+En contraste, el girasol y el sorgo aparecen principalmente en zonas de menor producción relativa, incluso cuando ocupan superficies considerables. Esto permite observar que una mayor extensión de terreno no necesariamente representa una producción proporcionalmente mayor.
+
+También destacan la papa total y la cebolla total, cuyos registros se separan de la concentración principal de puntos. Su comportamiento puede relacionarse con rendimientos elevados por hectárea, ya que son cultivos que pueden alcanzar una producción considerable utilizando superficies menores en comparación con los grandes cultivos extensivos.
+
+Por lo tanto, la gráfica permite reconocer que cada cultivo presenta una relación diferente entre la superficie utilizada y la producción obtenida.
+
+### Animación: evolución de los cultivos durante el periodo
+
+La animación permite observar cómo cambian simultáneamente la superficie cosechada, el rendimiento y la producción de los cultivos a través de las campañas agrícolas.
+
+En los primeros años, la avena se mantiene entre los cultivos con mayor rendimiento, aunque sus desplazamientos son relativamente pequeños. El maíz también muestra cambios importantes y progresivamente adquiere mayor protagonismo. Durante este periodo, el girasol destaca por su desplazamiento hacia la derecha, lo que representa un aumento de su superficie cosechada.
+
+Alrededor de 1980 se observan cambios relevantes en la cebolla total, que presenta un incremento considerable en el rendimiento, y en la cebada cervecera, que aumenta su superficie cosechada y modifica notablemente su posición. La soja también comienza a destacar por el crecimiento del tamaño de su burbuja, lo que representa un aumento de su producción.
+
+Durante la década de 1990, el maíz vuelve a sobresalir por su crecimiento en rendimiento, mientras que la soja continúa expandiendo su superficie y aumentando su producción. Entre 1997 y 1998 se observa una caída general en el comportamiento de varios cultivos. Este periodo coincide con un episodio intenso del fenómeno de El Niño, aunque la animación por sí sola no permite determinar si este fenómeno fue la causa directa de las variaciones observadas.
+
+A partir del año 2000, la soja continúa desplazándose hacia mayores superficies cosechadas y aumentando su producción. El trigo también presenta variaciones importantes en su posición a lo largo del tiempo. Posteriormente, alrededor de 2010, el maíz vuelve a destacar, tanto por su desplazamiento hacia mayores rendimientos como por el aumento de su superficie y producción. La cebada cervecera también presenta cambios considerables durante esta etapa.
+
+En conjunto, la animación muestra que los cultivos no evolucionan de la misma manera: algunos destacan por mejorar su rendimiento, otros por ampliar su superficie y otros por incrementar su producción. El maíz y la soja son los que presentan algunos de los cambios más importantes durante las últimas décadas del registro.
+
+### Exploración interactiva con PyGWalker
+
+La exploración mediante PyGWalker permitió comparar variables adicionales y observar relaciones que no se identifican fácilmente en las gráficas anteriores.
+
+En los datos exportados para esta exploración se observa una relación positiva entre la superficie cosechada y la producción. Al calcular su correlación sobre los registros agrupados, se obtiene un valor aproximado de 0.94, lo que indica que, en general, los registros con mayor superficie cosechada también presentan mayores volúmenes de producción. Asimismo, la superficie sembrada y la superficie cosechada presentan una relación muy alta, con una correlación aproximada de 0.997.
+
+Sin embargo, la temperatura presenta una relación prácticamente nula con el rendimiento y la producción en estos registros agrupados. Esto no significa que la temperatura no influya en la agricultura, sino que esta exploración no permite identificar una relación lineal clara entre las variables analizadas.
+
+Es importante considerar que los datos exportados están agrupados por provincia y temperatura, y que estas correlaciones describen los registros disponibles, no una relación de causa y efecto. Por ello, sería necesario realizar un análisis más específico por cultivo y periodo para obtener conclusiones más precisas.
+
+### Conclusiones generales
+
+Las visualizaciones interactivas permitieron identificar diferencias importantes en la evolución de los principales cultivos agrícolas. El maíz destaca por el incremento de su rendimiento, mientras que la soja sobresale por la expansión de su superficie cosechada y el crecimiento de su producción. El trigo también presenta una evolución positiva, aunque más gradual.
+
+Además, se comprobó que el aumento de la superficie utilizada no siempre representa un incremento proporcional del rendimiento, ya que cada cultivo tiene características y comportamientos distintos. La animación permitió complementar esta observación al mostrar cómo cambian los cultivos entre campañas, identificando periodos de crecimiento, estabilidad y fluctuación.
+
+Finalmente, PyGWalker facilitó la exploración de relaciones adicionales entre las variables, especialmente entre la superficie agrícola y la producción. En conjunto, estas herramientas permitieron comprender mejor los datos, reconocer patrones y observar que la evolución agrícola depende de diferentes factores y no de una sola variable.
