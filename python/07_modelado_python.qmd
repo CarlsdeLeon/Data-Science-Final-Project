@@ -47,8 +47,6 @@ preproc_clf = joblib.load("data/ml/preproc_clf.joblib")
 print(f"Entrenamiento: {len(reg_train):,} | Prueba: {len(reg_test):,}")
 ```
 
-Paquetes necesarios: `pip install scikit-learn xgboost joblib`.
-
 Todos los modelos de este capítulo se entrenan con el mismo conjunto de entrenamiento y se evalúan con **el mismo conjunto de prueba**
 (tema 63). El preprocesamiento va dentro de cada `Pipeline`, así que se ajusta solo con entrenamiento.
 
@@ -202,7 +200,7 @@ comparacion
 ```
 
 **Cómo leerlo:** si el R² temporal es mucho menor que el de la partición aleatoria, el resultado aleatorio era optimista y la cifra
-realista para predecir campañas futuras es la temporal. Si ambos se parecen, el modelo es robusto. Completa la conclusión con tu tabla.
+realista para predecir campañas futuras es la temporal. Si ambos se parecen, el modelo es robusto. 
 
 # Problema 2: clasificación de la calidad
 
@@ -386,7 +384,7 @@ if tabla_clf.loc[tabla_clf.modelo == nombre_mejor_clf, "AUC_macro_OvR"].iloc[0] 
 #| cache: true
 idx = Xr_te.sample(5000, random_state=2026).index
 imp = permutation_importance(mejor_reg, Xr_te.loc[idx], yr_te.loc[idx], n_repeats=5,
-                             scoring="neg_root_mean_squared_error", random_state=2026, n_jobs=-1)
+                             scoring="neg_root_mean_squared_error", random_state=2026, n_jobs=1)
 
 importancias = pd.Series(imp.importances_mean, index=Xr_te.columns).sort_values()
 importancias.plot(kind="barh", figsize=(7, 3.5), color="#3A7CA5")

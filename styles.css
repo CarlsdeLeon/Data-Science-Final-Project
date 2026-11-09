@@ -7,7 +7,7 @@ h2 { border-bottom: 2px solid #2E6F40; padding-bottom: .25rem; margin-top: 2.4re
 
 /* Tablas */
 table { font-size: .85rem; }
-thead th { background: #2E6F40; color: #fff !important; }
+thead th { background: #2E6F40!important; color: #fff !important; }
 tbody tr:nth-of-type(even) { background: #f4f8f5; }
 .cell-output-display { overflow-x: auto; }
 

@@ -222,12 +222,6 @@ Una regresión logística para explicar la ausencia **no converge** aquí: el cu
 la evidencia se presenta con la tabla de conteos anterior.
 :::
 
-**Cómo interpretarlo (completa con tus resultados):**
-
-- Si el p-valor de Little es < 0.05, se rechaza MCAR.
-- La tabla de conteos muestra que la ausencia queda totalmente determinada por variables observadas (cultivo y año): es **MAR**.
-- Esto justifica usar métodos que aprovechen otras variables (regresión, KNN, MICE) en lugar de una media simple.
-
 ## 15–18. Métodos de imputación
 
 Se imputa **la superficie cosechada** con la producción, el cultivo, la provincia y el año como variables de apoyo
@@ -366,7 +360,7 @@ resultados |>
   labs(title = "Error de imputación por método", x = NULL, y = NULL)
 ```
 
-**Justificación (completa con tu tabla):** se elige el método con menor `RMSE_log`, porque las superficies abarcan varios órdenes
+**Justificación:** se elige el método con menor `RMSE_log`, porque las superficies abarcan varios órdenes
 de magnitud y lo importante es el error relativo. Los métodos que usan otras variables (regresión, KNN, MICE) reducen mucho el error frente a la media
 y la mediana, que ignoran el cultivo y el año. Las imputaciones tienen un error típico de decenas de porcentaje, por lo que se
 marcan con `sup_imputada` y no se usan para entrenar modelos (Fase 6).
@@ -375,7 +369,6 @@ marcan con `sup_imputada` y no se usan para entrenar modelos (Fase 6).
 
 El método final se elige **automáticamente** como el de menor `RMSE_log` entre los aplicables a toda la base
 (KNN se excluye de la imputación final porque es demasiado lento con ~118,000 filas, aunque sí se evalúa arriba).
-Si prefieres otro, escribe su nombre en `metodo_manual`.
 
 ```{r}
 #| label: imputacion-final

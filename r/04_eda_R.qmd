@@ -138,7 +138,7 @@ cor(
 )
 ```
 
-**Interpretación:** La correlación entre la superficie cosechada y la producción en escala logarítmica es extremadamente alta ($r \approx 0.935$), evidenciando una relación lineal directa de escala. La prueba de Kruskal-Wallis arroja un $p$-valor significativo debido al gran tamaño de muestra, aunque las medianas del rendimiento por nivel de calidad son prácticamente idénticas (2,000 kg/ha en todos los estratos), lo que denota nula relevancia práctica de esta variable sobre la productividad física.
+**Interpretación:** La correlación entre la superficie cosechada y la producción en escala logarítmica es extremadamente alta, evidenciando una relación lineal directa de escala. La prueba de Kruskal-Wallis arroja un $p$-valor significativo debido al gran tamaño de muestra, aunque las medianas del rendimiento por nivel de calidad son prácticamente idénticas (2,000 kg/ha en todos los estratos), lo que denota nula relevancia práctica de esta variable sobre la productividad física.
 
 ## 29. Análisis multivariado (PCA)
 
@@ -424,5 +424,5 @@ kruskal.test(rendimiento_wins_kg_ha ~ provincia, data = maiz)
 
 - **Evolución:** Las tendencias más sólidas y confiables de mejora en rendimiento por hectárea corresponden al arroz, té, maíz y papa, reflejando paquetes tecnológicos exitosos a lo largo de las décadas.
 - **Concentración:** La agricultura extensiva está fuertemente concentrada en la región pampeana, sumando Buenos Aires, Córdoba y Santa Fe el 74.7% de la superficie cosechada nacional.
-- **Superficie vs. producción:** Existe una correlación logarítmica muy fuerte ($r = 0.935$), donde el PC1 (57.5% de la varianza) representa claramente el tamaño productivo y el PC2 (21.8%) el rendimiento.
+- **Superficie vs. producción:** Existe una correlación logarítmica muy fuerte, donde el PC1 (57.5% de la varianza) representa claramente el tamaño productivo y el PC2 (21.8%) el rendimiento.
 - **Variabilidad:** El maíz y la cebolla presentan la mayor dispersión y coeficiente de variación debido a la diversidad de condiciones agroclimáticas y tecnológicas en las que se cultivan en el país.
