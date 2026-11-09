@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "Agricultura_Argentina_1969_2017"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "331f231f-1a9e-4075-9f31-8b80b815a1d9"
+  }
+}

@@ -1,0 +1,275 @@
+{
+  "compatibilityLevel": 1606,
+  "model": {
+    "annotations": [
+      {
+        "name": "PBI_QueryOrder",
+        "value": "[\"Agricultura\"]"
+      },
+      {
+        "name": "PBI_ProTooling",
+        "value": "[\"DevMode\"]"
+      }
+    ],
+    "culture": "es-ES",
+    "dataAccessOptions": {
+      "legacyRedirects": true,
+      "returnErrorValuesAsNull": true
+    },
+    "defaultPowerBIDataSourceVersion": "powerBI_V3",
+    "discourageImplicitMeasures": true,
+    "sourceQueryCulture": "en-US",
+    "tables": [
+      {
+        "name": "Agricultura",
+        "annotations": [
+          {
+            "name": "PBI_ResultType",
+            "value": "Table"
+          }
+        ],
+        "columns": [
+          {
+            "name": "id_provincia",
+            "dataType": "int64",
+            "lineageTag": "1a9f9cbe-089a-47f7-9b9f-f785e2e17873",
+            "sourceColumn": "id_provincia",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "provincia",
+            "dataType": "string",
+            "lineageTag": "ac1889d6-4fdd-49f4-b3f9-356dfc152388",
+            "sourceColumn": "provincia",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "id_departamento",
+            "dataType": "int64",
+            "lineageTag": "0ffab687-f303-42a5-9135-d22620f70014",
+            "sourceColumn": "id_departamento",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "departamento",
+            "dataType": "string",
+            "lineageTag": "6dd8e8fb-763e-41a4-85ac-fe3c0e7cae8f",
+            "sourceColumn": "departamento",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "id_cultivo",
+            "dataType": "int64",
+            "lineageTag": "91f0d921-fee4-4496-a818-0b23076e1b92",
+            "sourceColumn": "id_cultivo",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "cultivo",
+            "dataType": "string",
+            "lineageTag": "165428eb-f915-46ab-b802-f256cace24cf",
+            "sourceColumn": "cultivo",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "id_campana",
+            "dataType": "int64",
+            "lineageTag": "6ada96d7-e3e9-4dd0-8ce6-56a36b564ae6",
+            "sourceColumn": "id_campana",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "campana",
+            "dataType": "string",
+            "lineageTag": "1bf4e3fd-8592-4516-8078-701ad5a8e9c5",
+            "sourceColumn": "campana",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "temperatura_c",
+            "dataType": "int64",
+            "lineageTag": "af3ea022-2714-45f4-9792-6cb5c5485003",
+            "sourceColumn": "temperatura_c",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "sup_sembrada_ha",
+            "dataType": "double",
+            "lineageTag": "14194854-45e7-42a3-bde1-798bb85f9b49",
+            "sourceColumn": "sup_sembrada_ha",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "sup_cosechada_ha",
+            "dataType": "double",
+            "lineageTag": "fc98fa45-3451-48b1-ac84-cf60b6d0008d",
+            "sourceColumn": "sup_cosechada_ha",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "produccion_tn",
+            "dataType": "int64",
+            "lineageTag": "bd78de81-f6c2-46a1-bb08-b46a8a8d467c",
+            "sourceColumn": "produccion_tn",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "rendimiento_kg_ha",
+            "dataType": "double",
+            "lineageTag": "d0a1a69d-6e2c-4290-bf6a-c62827f82308",
+            "sourceColumn": "rendimiento_kg_ha",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "calidad",
+            "dataType": "string",
+            "lineageTag": "d7fb336b-9431-43fb-bf8e-24a0f015ce7a",
+            "sourceColumn": "calidad",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "anio_inicio",
+            "dataType": "int64",
+            "lineageTag": "c5f33fba-c530-4e32-8114-eaa1d36d3433",
+            "sourceColumn": "anio_inicio",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "clave_departamento",
+            "dataType": "string",
+            "lineageTag": "d0035ee9-4005-45d3-b24f-22d93715c3d1",
+            "sourceColumn": "clave_departamento",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "id_fila",
+            "dataType": "int64",
+            "isHidden": true,
+            "lineageTag": "aa7193bc-7f88-44ec-8030-acd5685cfd7c",
+            "sourceColumn": "id_fila",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "sup_imputada",
+            "dataType": "boolean",
+            "lineageTag": "42029b8f-554d-43f9-9239-90eb96cb6d03",
+            "sourceColumn": "sup_imputada",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "rendimiento_wins_kg_ha",
+            "dataType": "double",
+            "lineageTag": "0d388c2f-e1f5-4aaf-b8f2-1c03248e0731",
+            "sourceColumn": "rendimiento_wins_kg_ha",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "rend_winsorizado",
+            "dataType": "boolean",
+            "lineageTag": "8be3c824-fbc2-4911-99bf-822f7f7524f3",
+            "sourceColumn": "rend_winsorizado",
+            "summarizeBy": "none"
+          }
+        ],
+        "lineageTag": "a74946aa-9d4b-4331-a372-4d66efc71835",
+        "measures": [
+          {
+            "name": "Registros originales",
+            "expression": "COUNTROWS('Agricultura')",
+            "formatString": "#,##0",
+            "lineageTag": "8b860677-a2ab-434d-ac07-be74a971dda8"
+          },
+          {
+            "name": "Registros analiticos",
+            "expression": "CALCULATE(COUNTROWS('Agricultura'), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())",
+            "formatString": "#,##0",
+            "lineageTag": "13496cac-c868-405d-b61d-11a8a6ca6634"
+          },
+          {
+            "name": "Produccion tn",
+            "expression": "CALCULATE(SUM('Agricultura'[produccion_tn]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())",
+            "formatString": "#,##0",
+            "lineageTag": "d571f977-45e6-4ca2-93d1-191be63e96eb"
+          },
+          {
+            "name": "Superficie cosechada ha",
+            "expression": "CALCULATE(SUM('Agricultura'[sup_cosechada_ha]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())",
+            "formatString": "#,##0",
+            "lineageTag": "4f5f0310-e39c-41ea-ac0d-f86c9c592924"
+          },
+          {
+            "name": "Superficie sembrada ha",
+            "expression": "CALCULATE(SUM('Agricultura'[sup_sembrada_ha]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())",
+            "formatString": "#,##0",
+            "lineageTag": "79bf8296-1392-4e86-ad73-02971f5ebc59"
+          },
+          {
+            "name": "Rendimiento ponderado kg ha",
+            "expression": "DIVIDE([Produccion tn] * 1000, [Superficie cosechada ha])",
+            "formatString": "#,##0.0",
+            "lineageTag": "83ae33b1-d18e-4acf-b0d3-d35f3ce0e3b6"
+          },
+          {
+            "name": "Tasa cosecha porcentaje",
+            "expression": "DIVIDE([Superficie cosechada ha], [Superficie sembrada ha])",
+            "formatString": "0.0%",
+            "lineageTag": "f6189b1a-a888-480e-a64c-37057208cd97"
+          },
+          {
+            "name": "Cultivos distintos",
+            "expression": "CALCULATE(DISTINCTCOUNT('Agricultura'[cultivo]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())",
+            "formatString": "#,##0",
+            "lineageTag": "57ff9c57-878b-4bb9-8735-f1c279ca1cf6"
+          },
+          {
+            "name": "Provincias distintas",
+            "expression": "CALCULATE(DISTINCTCOUNT('Agricultura'[provincia]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())",
+            "formatString": "#,##0",
+            "lineageTag": "d6b741ac-7a8c-4485-840d-cbd1ac26ac59"
+          },
+          {
+            "name": "Produccion millones tn",
+            "expression": "DIVIDE([Produccion tn], 1000000)",
+            "formatString": "#,##0.0",
+            "lineageTag": "d2e287b0-e743-4c3c-9b72-9bdd61e02d7e"
+          },
+          {
+            "name": "Participacion produccion",
+            "expression": "DIVIDE([Produccion tn], CALCULATE([Produccion tn], ALLSELECTED('Agricultura'[cultivo])))",
+            "formatString": "0.0%",
+            "lineageTag": "168989a3-328c-4816-9ef7-29e5a046ecc7"
+          },
+          {
+            "name": "Registros winsorizados",
+            "expression": "CALCULATE(COUNTROWS('Agricultura'), 'Agricultura'[rend_winsorizado] = TRUE(), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())",
+            "formatString": "#,##0",
+            "lineageTag": "02afef63-bfed-4cd1-aeaf-2f59c187a909"
+          },
+          {
+            "name": "Temperatura media C",
+            "expression": "CALCULATE(AVERAGE('Agricultura'[temperatura_c]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())",
+            "formatString": "0.0",
+            "lineageTag": "7a14d9d0-3d42-405e-bafc-9e444a86d70c"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Agricultura",
+            "mode": "import",
+            "source": {
+              "expression": [
+                "let",
+                "    Fuente = Csv.Document(Web.Contents(\"https://raw.githubusercontent.com/CarlsdeLeon/Data-Sience-Final-Project/main/data/agricultura_final.csv\"), [Delimiter=\",\", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),",
+                "    Encabezados = Table.PromoteHeaders(Fuente, [PromoteAllScalars=true]),",
+                "    Tipos = Table.TransformColumnTypes(Encabezados, {{\"id_provincia\", Int64.Type}, {\"provincia\", type text}, {\"id_departamento\", Int64.Type}, {\"departamento\", type text}, {\"id_cultivo\", Int64.Type}, {\"cultivo\", type text}, {\"id_campana\", Int64.Type}, {\"campana\", type text}, {\"temperatura_c\", Int64.Type}, {\"sup_sembrada_ha\", type number}, {\"sup_cosechada_ha\", type number}, {\"produccion_tn\", Int64.Type}, {\"rendimiento_kg_ha\", type number}, {\"calidad\", type text}, {\"anio_inicio\", Int64.Type}, {\"clave_departamento\", type text}, {\"id_fila\", Int64.Type}, {\"sup_imputada\", type logical}, {\"rendimiento_wins_kg_ha\", type number}, {\"rend_winsorizado\", type logical}}, \"en-US\")",
+                "in",
+                "    Tipos"
+              ],
+              "type": "m"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
