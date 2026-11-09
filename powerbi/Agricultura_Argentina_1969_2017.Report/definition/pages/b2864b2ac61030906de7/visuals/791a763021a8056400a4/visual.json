@@ -1,0 +1,83 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "791a763021a8056400a4",
+  "position": {
+    "x": 425.71428571428572,
+    "y": 140,
+    "z": 1002,
+    "height": 65.714285714285722,
+    "width": 390,
+    "tabOrder": 2
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Agricultura"
+                    }
+                  },
+                  "Property": "provincia"
+                }
+              },
+              "queryRef": "Agricultura.provincia",
+              "nativeQueryRef": "provincia",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "data": [
+        {
+          "properties": {
+            "mode": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Dropdown'"
+                }
+              }
+            },
+            "isInvertedSelectionMode": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "general": [
+        {
+          "properties": {}
+        }
+      ]
+    }
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "5baff590029d73cc792d",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Agricultura"
+              }
+            },
+            "Property": "provincia"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
+  }
+}

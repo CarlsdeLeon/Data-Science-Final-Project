@@ -1,0 +1,83 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "f06442b87759b474be8c",
+  "position": {
+    "x": 20.828402366863909,
+    "y": 130.6508875739645,
+    "z": 1001,
+    "height": 53.017751479289949,
+    "width": 378.69822485207106,
+    "tabOrder": 1
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Agricultura"
+                    }
+                  },
+                  "Property": "campana"
+                }
+              },
+              "queryRef": "Agricultura.campana",
+              "nativeQueryRef": "campana",
+              "active": true
+            }
+          ]
+        }
+      }
+    },
+    "objects": {
+      "data": [
+        {
+          "properties": {
+            "mode": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Dropdown'"
+                }
+              }
+            },
+            "isInvertedSelectionMode": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "general": [
+        {
+          "properties": {}
+        }
+      ]
+    }
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "2ae08de69090bbb83040",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Agricultura"
+              }
+            },
+            "Property": "campana"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
+  }
+}

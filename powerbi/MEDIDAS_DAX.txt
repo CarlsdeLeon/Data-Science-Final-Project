@@ -1,0 +1,38 @@
+Registros originales =
+COUNTROWS('Agricultura')
+
+Registros analiticos =
+CALCULATE(COUNTROWS('Agricultura'), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())
+
+Produccion tn =
+CALCULATE(SUM('Agricultura'[produccion_tn]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())
+
+Superficie cosechada ha =
+CALCULATE(SUM('Agricultura'[sup_cosechada_ha]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())
+
+Superficie sembrada ha =
+CALCULATE(SUM('Agricultura'[sup_sembrada_ha]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())
+
+Rendimiento ponderado kg ha =
+DIVIDE([Produccion tn] * 1000, [Superficie cosechada ha])
+
+Tasa cosecha porcentaje =
+DIVIDE([Superficie cosechada ha], [Superficie sembrada ha])
+
+Cultivos distintos =
+CALCULATE(DISTINCTCOUNT('Agricultura'[cultivo]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())
+
+Provincias distintas =
+CALCULATE(DISTINCTCOUNT('Agricultura'[provincia]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())
+
+Produccion millones tn =
+DIVIDE([Produccion tn], 1000000)
+
+Participacion produccion =
+DIVIDE([Produccion tn], CALCULATE([Produccion tn], ALLSELECTED('Agricultura'[cultivo])))
+
+Registros winsorizados =
+CALCULATE(COUNTROWS('Agricultura'), 'Agricultura'[rend_winsorizado] = TRUE(), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())
+
+Temperatura media C =
+CALCULATE(AVERAGE('Agricultura'[temperatura_c]), 'Agricultura'[sup_cosechada_ha] > 0, 'Agricultura'[produccion_tn] > 0, 'Agricultura'[sup_imputada] = FALSE())
